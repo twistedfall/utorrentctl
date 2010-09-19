@@ -71,7 +71,7 @@ class TorrentStatus:
 
 class Torrent:
 	
-	_parent = None
+	_utorrent = None
 	
 	hash = ''
 	status = None
@@ -96,8 +96,8 @@ class Torrent:
 	rss_url = ''
 	status_message = ''
 
-	def __init__( self, torrent, parent ):
-		self._parent = parent
+	def __init__( self, torrent, utorrent ):
+		self._utorrent = utorrent
 		self.hash, status, self.name, self.size, progress, self.downloaded, \
 			self.uploaded, ratio, self.upspeed, self.downspeed, self.eta, self.label, \
 			self.peers_connected, self.peers_total, self.seeds_connected, self.seeds_total, self.availability, \
@@ -110,25 +110,25 @@ class Torrent:
 		return '{} {}'.format( self.hash, self.name )
 	
 	def file_list( self ):
-		return self._parent.file_list( self )
+		return self._utorrent.file_list( self )
 	
 	def start( self, force = False ):
-		return self._parent.torrent_start( self, force )
+		return self._utorrent.torrent_start( self, force )
 
 	def stop( self ):
-		return self._parent.torrent_stop( self )
+		return self._utorrent.torrent_stop( self )
 
 	def pause( self ):
-		return self._parent.torrent_pause( self )
+		return self._utorrent.torrent_pause( self )
 
 	def resume( self ):
-		return self._parent.torrent_resume( self )
+		return self._utorrent.torrent_resume( self )
 
 	def recheck( self ):
-		return self._parent.torrent_recheck( self )
+		return self._utorrent.torrent_recheck( self )
 
 	def remove( self, with_data = False ):
-		return self._parent.torrent_remove( self, with_data )
+		return self._utorrent.torrent_remove( self, with_data )
 
 class Label:
 	

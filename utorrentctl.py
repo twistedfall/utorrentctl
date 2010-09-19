@@ -16,7 +16,7 @@
 """
 
 """
-	utorrentctl - µTorrent cli remote control utility
+	utorrentctl - uTorrent cli remote control utility
 """
 
 import urllib.request, urllib.error, json, re, posixpath, ntpath
@@ -397,8 +397,11 @@ if __name__ == '__main__':
 	
 	import optparse, sys
 	
+	def print_term( obj ):
+		print( str( obj ).encode( sys.stdout.encoding, 'replace' ).decode( sys.stdout.encoding ) )
+	
 	parser = optparse.OptionParser()
-	parser.add_option( '-H', '--host', dest = 'host', default = utorrentcfg[ 'host' ], help = 'host of µTorrent (hostname:port)' )
+	parser.add_option( '-H', '--host', dest = 'host', default = utorrentcfg[ 'host' ], help = 'host of uTorrent (hostname:port)' )
 	parser.add_option( '-u', '--user', dest = 'user', default = utorrentcfg[ 'login' ], help = 'user name' )
 	parser.add_option( '-p', '--password', dest = 'password', default = utorrentcfg[ 'password' ], help = 'user password' )
 	parser.add_option( '-l', '--list-torrents', action = 'store_const', dest = 'action', const = 'torrent_list', help = 'list all torrents' )
@@ -421,19 +424,19 @@ if __name__ == '__main__':
 		try:
 			utorrent = ut_connect( opts.host, opts.user, opts.password )
 		except urllib.error.URLError as e:
-			print( e )
+			print_term( e )
 			sys.exit( 2 )
 
 	if opts.action == 'torrent_list':
 		for i in utorrent.torrent_list():
-			print( i )
+			print_term( i )
 
 	elif opts.action == 'file_list':
 		for i in args:
 			for h, fs in utorrent.file_list( i ).items():
-				print( 'Torrent: ' + h)
+				print_term( 'Torrent: ' + h )
 				for f in fs:
-					print( '+', f )
+					print_term( '+ ' + str( f ) )
 
 	elif opts.action == 'add':
 		for i in args:
@@ -441,13 +444,13 @@ if __name__ == '__main__':
 			try:
 				utorrent.torrent_add_file( i, opts.dir )
 			except uTorrentError as e:
-				print( e )
+				print_term( e )
 				sys.exit( 1 )
 
 	elif opts.action == 'settings_get':
 		for i in utorrent.settings_get().items():
 			if len( args ) == 0 or i[ 0 ] in args:
-				print( '{} = {}'.format( *i ) )
+				print_term( '{} = {}'.format( *i ) )
 
 	elif opts.action == 'settings_set':
 		settings = {}

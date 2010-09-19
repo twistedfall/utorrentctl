@@ -168,8 +168,11 @@ class Priority:
 
 class File:
 	
+	_utorrent = None
+
 	_parent_hash = ''
 	
+	index = 0
 	name = ''
 	size = 0
 	size_h = ''
@@ -178,8 +181,10 @@ class File:
 	priority = 0
 	progress = 0.
 	
-	def __init__( self, file, parent_hash ):
+	def __init__( self, file, index, parent_hash, utorrent ):
 		self._parent_hash = parent_hash
+		self.index = index
+		self.hash = "{}.{}".format( self._parent_hash, self.index )
 		self.name, self.size, self.downloaded, priority = file
 		self.priority = Priority( priority )
 		self.progress = round( float( self.downloaded ) / self.size * 100, 1 )
@@ -187,8 +192,11 @@ class File:
 		self.downloaded_h = uTorrent.human_size( self.downloaded )
 
 	def __str__( self ):
-		return '[{: <15}] {: >5}% ({: >9} / {: >9}) {}'.format( self.priority, self.progress, self.downloaded_h, self.size_h, self.name )
+		return '{: <44} [{: <15}] {: >5}% ({: >9} / {: >9}) {}'.format( self.hash, self.priority, self.progress, self.downloaded_h, self.size_h, self.name )
 
+	def set_priority( self, priority ):
+		utorrent.file_set_priority( { self.hash : priority } )
+		
 
 class uTorrent:
 	
@@ -258,7 +266,7 @@ class uTorrent:
 			else:
 				raise uTorrentError( 'Hash designation only supported via Torrent class or string' )
 		return { 'hash' : out }
-
+	
 	def _build_opener( self ):
 		authh = urllib.request.HTTPBasicAuthHandler()
 		authh.add_password( 'uTorrent', self._url, self._login, self._password )
@@ -373,8 +381,21 @@ class uTorrent:
 		out = {}
 		fi = iter( res[ 'files' ] );
 		for hash in fi:
-			out[ hash ] = [ File( f, hash ) for f in next( fi ) ]
+			out[ hash ] = [ File( f, i, hash, self ) for i, f in enumerate( next( fi ) ) ]
 		return out
+	
+	def file_set_priority( self, files ):
+		args = []
+		for hash, prio in files.items():
+			if isinstance( hash, File ):
+				hash = hash.hash
+			if not isinstance( prio, Priority ):
+				prio = Priority( prio )
+			parent_hash, index = hash.split( '.', 1 )
+			args.append( 'hash={}&p={}&f={}'.format( quote( parent_hash, ''), quote( str( prio.priority ), '' ), quote( index, '' ) ) )
+			res = self._do_action( 'setprio', params_str = '&'.join( args ) )
+		self._update_build( res )
+			
 	
 	def settings_get( self ):
 		res = self._do_action( 'getsettings' )
@@ -414,7 +435,6 @@ if __name__ == '__main__':
 	parser.add_option( '-u', '--user', dest = 'user', default = utorrentcfg[ 'login' ], help = 'user name' )
 	parser.add_option( '-p', '--password', dest = 'password', default = utorrentcfg[ 'password' ], help = 'user password' )
 	parser.add_option( '-l', '--list-torrents', action = 'store_const', dest = 'action', const = 'torrent_list', help = 'list all torrents' )
-	parser.add_option( '-f', '--list-files', action = 'store_const', dest = 'action', const = 'file_list', help = 'displays file list in torrent (hash hash ...)' )
 	parser.add_option( '-a', '--add', action = 'store_const', dest = 'action', const = 'add', help = 'add torrents specified by local file names' )
 	parser.add_option( '--dir', dest = 'dir', help = 'directory to download added torrent, if path is relative then it is made relative to current download path parent directory (only for --add)' )
 	parser.add_option( '--settings', action = 'store_const', dest = 'action', const = 'settings_get', help = 'show current server settings, optionally you can use specific setting keys (name name ...)' )
@@ -427,6 +447,8 @@ if __name__ == '__main__':
 	parser.add_option( '--remove', action = 'store_const', dest = 'action', const = 'torrent_remove', help = 'remove torrents (hash hash ...)' )
 	parser.add_option( '--force', action = 'store_true', dest = 'force', help = 'forces current command (only for --start)' )
 	parser.add_option( '--with-data', action = 'store_true', dest = 'with_data', help = 'when removing torrent also remove its data (only for --remove)' )
+	parser.add_option( '-f', '--list-files', action = 'store_const', dest = 'action', const = 'file_list', help = 'displays file list within torrents (hash hash ...)' )
+	parser.add_option( '--set-file-priority', action = 'store_const', dest = 'action', const = 'set_file_priority', help = 'sets specified file priority (hash.file_index=prio hash.file_index=prio ...) prio=0..3' )
 	opts, args = parser.parse_args()
 	
 	if opts.action != None:
@@ -439,13 +461,6 @@ if __name__ == '__main__':
 	if opts.action == 'torrent_list':
 		for i in utorrent.torrent_list():
 			print_term( i )
-
-	elif opts.action == 'file_list':
-		for i in args:
-			for h, fs in utorrent.file_list( i ).items():
-				print_term( 'Torrent: ' + h )
-				for f in fs:
-					print_term( '+ ' + str( f ) )
 
 	elif opts.action == 'add':
 		for i in args:
@@ -497,6 +512,16 @@ if __name__ == '__main__':
 		for i in args:
 			print( 'Removing {}...'.format( i ) )
 			utorrent.torrent_remove( i, opts.with_data )
+
+	elif opts.action == 'file_list':
+		for i in args:
+			for h, fs in utorrent.file_list( i ).items():
+				print_term( 'Torrent: ' + h )
+				for f in fs:
+					print_term( ' + ' + str( f ) )
+
+	elif opts.action == 'set_file_priority':
+		utorrent.file_set_priority( { k : v for k, v in [ i.split( '=' ) for i in args ] } )
 
 	else:
 		parser.print_help()

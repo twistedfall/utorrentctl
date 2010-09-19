@@ -411,7 +411,8 @@ class uTorrent:
 			if isinstance( v, bool ):
 				v = int( v )
 			args.append( 's={}&v={}'.format( quote( k, '' ), quote( str( v ), '' ) ) )
-		res = self._do_action( action = 'setsetting', params_str = '&'.join( args ) )
+		res = self._do_action( 'setsetting', params_str = '&'.join( args ) )
+		self._update_build( res )
 
 		
 class uTorrentServer( uTorrent ):
@@ -437,7 +438,7 @@ if __name__ == '__main__':
 	parser.add_option( '-l', '--list-torrents', action = 'store_const', dest = 'action', const = 'torrent_list', help = 'list all torrents' )
 	parser.add_option( '-a', '--add', action = 'store_const', dest = 'action', const = 'add', help = 'add torrents specified by local file names' )
 	parser.add_option( '--dir', dest = 'dir', help = 'directory to download added torrent, if path is relative then it is made relative to current download path parent directory (only for --add)' )
-	parser.add_option( '--settings', action = 'store_const', dest = 'action', const = 'settings_get', help = 'show current server settings, optionally you can use specific setting keys (name name ...)' )
+	parser.add_option( '-g', '--settings', action = 'store_const', dest = 'action', const = 'settings_get', help = 'show current server settings, optionally you can use specific setting keys (name name ...)' )
 	parser.add_option( '-s', '--set', action = 'store_const', dest = 'action', const = 'settings_set', help = 'assign settings value (key1=value1 key2=value2 ...)' )
 	parser.add_option( '--start', action = 'store_const', dest = 'action', const = 'torrent_start', help = 'start torrents (hash hash ...)' )
 	parser.add_option( '--stop', action = 'store_const', dest = 'action', const = 'torrent_stop', help = 'stop torrents (hash hash ...)' )
@@ -477,11 +478,7 @@ if __name__ == '__main__':
 				print_term( '{} = {}'.format( *i ) )
 
 	elif opts.action == 'settings_set':
-		settings = {}
-		for i in args:
-			k, v = i.split( '=' )
-			settings[ k ] = v
-		utorrent.settings_set( settings )
+		utorrent.settings_set( { k : v for k, v in [ i.split( '=' ) for i in args ] } )
 		
 	elif opts.action == 'torrent_start':
 		for i in args:

@@ -147,7 +147,11 @@ class Priority:
 	priority = 0
 	
 	def __init__( self, priority ):
-		self.priority = priority
+		priority = int( priority )
+		if priority in range( 4 ):
+			self.priority = priority
+		else:
+			self.priority = 1
 
 	def __str__( self ):
 		if self.priority == 0:
@@ -158,6 +162,8 @@ class Priority:
 			return 'normal priority'
 		elif self.priority == 3:
 			return 'high priority'
+		else:
+			return 'unknown priority'
 
 
 class File:

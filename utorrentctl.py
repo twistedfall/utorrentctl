@@ -121,6 +121,9 @@ class Torrent:
 	def pause( self ):
 		return self._parent.torrent_pause( self )
 
+	def resume( self ):
+		return self._parent.torrent_resume( self )
+
 	def recheck( self ):
 		return self._parent.torrent_recheck( self )
 

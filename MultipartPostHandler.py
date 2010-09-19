@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 ####
 # 02/2006 Will Holcomb <wholcomb@gmail.com>

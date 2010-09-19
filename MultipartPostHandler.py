@@ -64,7 +64,7 @@ class MultipartPostHandler(urllib.request.BaseHandler):
                     else:
                         v_vars.append((key, value))
             except TypeError:
-                raise TypeError( "not a valid non-string sequence or mapping object" )
+                raise TypeError("not a valid non-string sequence or mapping object")
 
             if len(v_files) == 0:
                 data = urllib.parse.urlencode(v_vars, doseq)
@@ -73,7 +73,7 @@ class MultipartPostHandler(urllib.request.BaseHandler):
                 contenttype = 'multipart/form-data; boundary=' + boundary
                 if(request.has_header('Content-Type')
                    and request.get_header('Content-Type').find('multipart/form-data') != 0):
-                    print( "Replacing {0} with {1}".format(request.get_header('content-type'), 'multipart/form-data') )
+                    print("Replacing {0} with {1}".format(request.get_header('content-type'), 'multipart/form-data'))
                 request.add_unredirected_header('Content-Type', contenttype)
 
             request.add_data(data)
@@ -95,7 +95,7 @@ class MultipartPostHandler(urllib.request.BaseHandler):
             buffer += 'Content-Disposition: form-data; name="{0}"; filename="{1}"\r\n'.format(key, filename)
             buffer += 'Content-Type: {0}\r\n'.format(contenttype)
             fd.seek(0)
-            buffer += '\r\n' + fd.read().decode( 'latin1' ) + '\r\n'
+            buffer += '\r\n' + fd.read().decode('latin1') + '\r\n'
         buffer += '--{0}--\r\n\r\n'.format(boundary)
         return boundary, buffer
 

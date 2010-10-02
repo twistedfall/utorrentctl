@@ -322,7 +322,7 @@ class uTorrent:
 			return 'action=' + quote( action, '' ) + args
 	
 	def _do_action( self, action, params = None, params_str = None, data = None, retry = True ):
-		return json.loads( self._get_data( self._action( action, params, params_str ), data ) )
+		return json.loads( self._get_data( self._action( action, params, params_str ), data, retry ) )
 	
 	def connect( self, host, login, password ):
 		self._host = host

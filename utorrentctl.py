@@ -389,7 +389,7 @@ class uTorrent:
 	def _create_torrent_upload( self, torrent_data, torrent_filename ):
 		out = '\r\n'.join( (
 			'--{{BOUNDARY}}',
-			'Content-Disposition: form-data; name="torrent_file"; filename="{}"'.format( torrent_filename ),
+			'Content-Disposition: form-data; name="torrent_file"; filename="{}"'.format( quote( torrent_filename, '' ) ),
 			'Content-Type: application/x-bittorrent',
 			'',
 			torrent_data.decode( 'latin1' ),

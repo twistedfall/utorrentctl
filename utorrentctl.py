@@ -61,6 +61,7 @@ class TorrentStatus:
 			out.append( 'checked' )
 		if self.error:
 			out.append( 'error' )
+		if self.paused:
 			out.append( 'paused' )
 		if self.queued:
 			out.append( 'queued' )

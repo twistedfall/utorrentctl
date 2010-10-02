@@ -20,13 +20,48 @@
 """
 
 import urllib.request, http.client, http.cookiejar, socket
-import re, json, base64, posixpath, ntpath, email.generator, os.path
+import re, json, base64, posixpath, ntpath, email.generator, os.path, datetime, errno
 from urllib.parse import quote
 from config import utorrentcfg
 
 class uTorrentError( Exception ):
 	pass
 
+
+class Version:
+	
+	product = ''
+	major = 0
+	minor = 0
+	build = 0
+	engine = 0
+	ui = 0
+	date = None
+	user_agent = ''
+	peer_id = ''
+	device_id = ''
+	
+	def __init__( self, res ):
+		if 'version' in res: # server returns full data
+			self.product = res[ 'version' ][ 'product_code' ]
+			self.major = res[ 'version' ][ 'major_version' ]
+			self.minor = res[ 'version' ][ 'minor_version' ]
+			self.build = res[ 'build' ]
+			self.engine = res[ 'version' ][ 'engine_version' ]
+			self.ui = res[ 'version' ][ 'ui_version' ]
+			date = res[ 'version' ][ 'version_date' ].split( ' ' )
+			self.date = datetime.datetime( *list( map( int, date[ 0 ].split( '-' ) ) ) + list( map( int, date[ 1 ].split( ':' ) ) ) )
+			self.user_agent = res[ 'version' ][ 'user_agent' ]
+			self.peer_id = res[ 'version' ][ 'peer_id' ]
+			self.device_id = res[ 'version' ][ 'device_id' ]
+		else:
+			self.product = 'desktop'
+			self.build = res[ 'build' ]
+			self.user_agent = 'BTWebClient/2040({})'.format( self.build )
+	
+	def __str__( self ):
+		return self.user_agent
+			
 
 class TorrentStatus:
 	
@@ -78,7 +113,7 @@ class Torrent:
 	status = None
 	name = ''
 	size = 0
-	progress = 0.
+	progress = 0. # in percents
 	downloaded = 0
 	uploaded = 0
 	ratio = 0.
@@ -93,9 +128,6 @@ class Torrent:
 	availability = 0
 	queue_order = 0
 	download_remain = 0
-	url = ''
-	rss_url = ''
-	status_message = ''
 
 	def __init__( self, torrent, utorrent ):
 		self._utorrent = utorrent
@@ -130,6 +162,21 @@ class Torrent:
 
 	def remove( self, with_data = False ):
 		return self._utorrent.torrent_remove( self, with_data )
+
+
+class Torrent_Server( Torrent ):
+
+	url = ''
+	rss_url = ''
+	status_message = ''
+	
+	def __init__( self, torrent, utorrent ):
+		Torrent.__init__( self, torrent[ 0 : 19 ], utorrent )
+		self.url, self.rss_url, self.status_message, junk = torrent[ 19 : ]
+
+	def remove( self, with_data = False, with_torrent = False ):
+		return self._utorrent.torrent_remove( self, with_data, with_torrent )
+
 
 class Label:
 	
@@ -183,8 +230,9 @@ class File:
 	progress = 0.
 	
 	def __init__( self, file, index, parent_hash, utorrent ):
-		self._parent_hash = parent_hash
 		self.index = index
+		self._parent_hash = parent_hash
+		self._utorrent = utorrent
 		self.hash = "{}.{}".format( self._parent_hash, self.index )
 		self.name, self.size, self.downloaded, priority = file
 		self.priority = Priority( priority )
@@ -196,29 +244,32 @@ class File:
 		return '{: <44} [{: <15}] {: >5}% ({: >9} / {: >9}) {}'.format( self.hash, self.priority, self.progress, self.downloaded_h, self.size_h, self.name )
 
 	def set_priority( self, priority ):
-		utorrent.file_set_priority( { self.hash : priority } )
+		self._utorrent.file_set_priority( { self.hash : priority } )
 		
 
-class uTorrent:
+class uTorrentConnection( http.client.HTTPConnection ):
 	
 	_host = ''
 	_login = ''
 	_password = ''
-	
-	_url = ''
-	
-	_connection = None
+
 	_request = None
 	_cookies = http.cookiejar.CookieJar()
-	
-	_build_version = 0
 	_token = ''
 	
 	_retry_max = 3
-	_pathmodule = ntpath
 	
+	_utorrent = None
+
 	def __init__( self, host, login, password ):
-		self.connect( host, login, password )
+		self._host = host
+		self._login = login
+		self._password = password
+		self._url = 'http://{}/gui/'.format( self._host )
+		self._request = urllib.request.Request( self._url )
+		self._request.add_header( 'Authorization', 'Basic ' + base64.b64encode( '{}:{}'.format( self._login, self._password ).encode( 'latin1' ) ).decode( 'ascii' ) )
+		http.client.HTTPConnection.__init__( self, self._request.host, timeout = 10 )
+		self._fetch_token()
 		
 	def _get_data( self, loc, data = None, retry = True ):
 		last_e = None
@@ -230,27 +281,93 @@ class uTorrent:
 					headers[ 'Content-Type' ] = 'multipart/form-data; boundary={}'.format( bnd )
 					data = data.replace( '{{BOUNDARY}}', bnd )
 				self._request.add_data( data )
-				self._connection.request( self._request.get_method(), self._request.selector + loc, self._request.get_data(), headers )
-				out = self._connection.getresponse()
-				if out.status == 400 or out.status == 404:
+				self.request( self._request.get_method(), self._request.selector + loc, self._request.get_data(), headers )
+				resp = self.getresponse()
+				out = resp.read().decode( 'utf8' )
+				if resp.status == 400:
+					last_e = uTorrentError( out )
+					if type( self._utorrent ) == uTorrentServer: # if uTorrent server alpha is bound to the same port as WebUI then it will respond with 'invalid request' to the first request in the connection
+						continue
+					raise last_e
+				elif resp.status == 404:
 					raise uTorrentError( 'Invalid request' )
-				elif out.status == 401:
+				elif resp.status == 401:
 					raise uTorrentError( 'Autorization failed' )
-				elif out.status != 200:
-					raise uTorrentError( '{}: {}'.format( out.reason, out.status ) )
-				self._cookies.extract_cookies( out, self._request )
+				elif resp.status != 200:
+					raise uTorrentError( '{}: {}'.format( resp.reason, resp.status ) )
+				self._cookies.extract_cookies( resp, self._request )
 				if len( self._cookies ) > 0:
 					self._request.add_header( 'Cookie', '; '.join( [ '{}={}'.format( quote( c.name, '' ), quote( c.value, '' ) ) for c in self._cookies ] ) )
-				return out.read().decode( 'utf8' )
+				return out
 			except socket.error as e:
-				if str( e ) == 'timed out':
-					self._connection.close()
-					self._connection.connect()
+				e = e.args[ 0 ]
+				if e.args[ 0 ] == errno.ECONNREFUSED:
+					self.close()
+					raise uTorrentError( e.args[ 1 ] )
+				elif str( e ) == 'timed out':
 					last_e = uTorrentError( 'Timeout' )
-					pass
+					continue
 		if last_e:
+			self.close()
 			raise last_e
+
+	def _fetch_token( self ):
+		data = self._get_data( 'token.html' )
+		match = re.search( "<div .*?id='token'.*?>(.+?)</div>", data )
+		if match == None:
+			raise uTorrentError( 'Can\'t fetch security token' )
+		self._token = match.group( 1 )
+		self._request = urllib.request.Request( '{}?token={}&'.format( self._request.get_full_url(), quote( self._token, '' ) ), headers = self._request.headers )
 	
+	def _action( self, action, params = None, params_str = None ):
+		args = ''
+		if params != None:
+			for k, v in params.items():
+				if isinstance( v, ( tuple, list ) ):
+					for i in v:
+						args += '&{}={}'.format( quote( k, '' ), quote( i, '' ) )
+				else:
+					args += '&{}={}'.format( quote( k, '' ), quote( v, '' ) )
+		if params_str != None and params_str != '':
+			args += '&' + params_str
+		if action == 'list':
+			return 'list=1' + args
+		else:
+			return 'action=' + quote( action, '' ) + args
+	
+	def do_action( self, action, params = None, params_str = None, data = None, retry = True ):
+		return json.loads( self._get_data( self._action( action, params, params_str ), data, retry ) )
+	
+	def utorrent( self ):
+		try:
+			ver = Version( self.do_action( 'getversion' ) )
+		except uTorrentError:
+			self.close() # need to close connection as desktop utorrent doesn't want to communicate over this connection any further
+			return uTorrent( self )
+		if ver.product == 'server':
+			return uTorrentServer( self, ver )
+		else:
+			raise uTorrentError( 'Unsupported server' )
+
+
+class uTorrent:
+	
+	_url = ''
+	
+	_connection = None
+	_version = None
+	
+	_TorrentClass = Torrent
+	
+	_pathmodule = ntpath
+	
+	api_version = 1
+	
+	def __init__( self, connection, version = None ):
+		self._connection = connection
+		self._connection._utorrent = self
+		self._version = version
+		
 	@staticmethod
 	def _setting_val( type, value ):
 		if type == 0: # int
@@ -286,7 +403,7 @@ class uTorrent:
 			torrents = ( torrents, )
 		out = []
 		for t in torrents:
-			if isinstance( t, Torrent ):
+			if isinstance( t, self._TorrentClass ):
 				out.append( t.hash )
 			elif isinstance( t, str ):
 				out.append( t )
@@ -294,55 +411,27 @@ class uTorrent:
 				raise uTorrentError( 'Hash designation only supported via Torrent class or string' )
 		return { 'hash' : out }
 	
-	def _fetch_token( self ):
-		data = self._get_data( 'token.html' )
-		match = re.search( "<div .*?id='token'.*?>(.+?)</div>", data )
-		if match == None:
-			raise uTorrentError( 'Can\'t fetch security token' )
-		self._token = match.group( 1 )
-		self._request = urllib.request.Request( '{}?token={}&'.format( self._request.get_full_url(), quote( self._token, '' ) ), headers = self._request.headers )
+	def _handle_download_dir( self, download_dir ):
+		out = None
+		if download_dir:
+			out = self.settings_get()[ 'dir_active_download' ]
+			if not self._pathmodule.isabs( download_dir ):
+				download_dir = self._pathmodule.dirname( out ) + self._pathmodule.sep + download_dir
+			self.settings_set( { 'dir_active_download' : download_dir } )
+		return out
 	
-	def _update_build( self, res ):
-		self._build_version = res[ 'build' ]
+	def _handle_prev_dir( self, prev_dir ):
+		if prev_dir:
+			self.settings_set( { 'dir_active_download' : prev_dir } )
 	
-	def _action( self, action, params = None, params_str = None ):
-		args = ''
-		if params != None:
-			for k, v in params.items():
-				if isinstance( v, ( tuple, list ) ):
-					for i in v:
-						args += '&{}={}'.format( quote( k, '' ), quote( i, '' ) )
-				else:
-					args += '&{}={}'.format( quote( k, '' ), quote( v, '' ) )
-		if params_str != None and params_str != '':
-			args += '&' + params_str
-		if action == 'list':
-			return 'list=1' + args
-		else:
-			return 'action=' + quote( action, '' ) + args
-	
-	def _do_action( self, action, params = None, params_str = None, data = None, retry = True ):
-		return json.loads( self._get_data( self._action( action, params, params_str ), data, retry ) )
-	
-	def connect( self, host, login, password ):
-		self._host = host
-		self._login = login
-		self._password = password
-		self._url = 'http://{}/gui/'.format( self._host )
-		self._request = urllib.request.Request( self._url )
-		self._request.add_header( 'Authorization', 'Basic ' + base64.b64encode( '{}:{}'.format( self._login, self._password ).encode( 'latin1' ) ).decode( 'ascii' ) )
-		self._connection = http.client.HTTPConnection( self._request.host, timeout = 1 )
-		self._fetch_token()
-		
-	def build_version( self ):
-		if self._build_version == 0:
-			self.torrent_start( '' )
-		return self._build_version
+	def version( self ):
+		if not self._version:
+			self._version = Version( self._connection.do_action( 'start' ) )
+		return self._version
 	
 	def torrent_list( self, labels = None ):
-		res = self._do_action( 'list' )
-		self._update_build( res )
-		out = [ Torrent( i, self ) for i in res[ 'torrents' ] ]
+		res = self._connection.do_action( 'list' )
+		out = [ self._TorrentClass( i, self ) for i in res[ 'torrents' ] ]
 		if labels != None:
 			labels.extend( [ Label( i ) for i in res[ 'label' ] ] )
 #		if rss_feeds != None:
@@ -352,26 +441,16 @@ class uTorrent:
 		return out
 	
 	def torrent_add_url( self, url, download_dir = None ):
-		if download_dir != None:
-			prev_dir = self.settings_get()[ 'dir_active_download' ]
-			if not self._pathmodule.isabs( download_dir ):
-				download_dir = self._pathmodule.dirname( prev_dir ) + self._pathmodule.sep + download_dir
-			self.settings_set( { 'dir_active_download' : download_dir } )
-		res = self._do_action( 'add-url', { 's' : url } );
-		if download_dir != None:
-			self.settings_set( { 'dir_active_download' : prev_dir } )
+		prev_dir = self._handle_download_dir( download_dir )
+		res = self._connection.do_action( 'add-url', { 's' : url } );
+		self._handle_prev_dir( prev_dir )
 		if 'error' in res:
 			raise uTorrentError( res[ 'error' ] )
 	
 	def torrent_add_data( self, torrent_data, download_dir = None, filename = 'default.torrent' ):
-		if download_dir != None:
-			prev_dir = self.settings_get()[ 'dir_active_download' ]
-			if not self._pathmodule.isabs( download_dir ):
-				download_dir = self._pathmodule.dirname( prev_dir ) + self._pathmodule.sep + download_dir
-			self.settings_set( { 'dir_active_download' : download_dir } )
-		res = self._do_action( 'add-file', data = self._create_torrent_upload( torrent_data, filename ) );
-		if download_dir != None:
-			self.settings_set( { 'dir_active_download' : prev_dir } )
+		prev_dir = self._handle_download_dir( download_dir )
+		res = self._connection.do_action( 'add-file', data = self._create_torrent_upload( torrent_data, filename ) );
+		self._handle_prev_dir( prev_dir )
 		if 'error' in res:
 			raise uTorrentError( res[ 'error' ] )
 
@@ -383,43 +462,36 @@ class uTorrent:
 		
 	def torrent_start( self, torrents, force = False ):
 		if force:
-			res = self._do_action( 'forcestart', self._get_hashes( torrents ) )
+			self._connection.do_action( 'forcestart', self._get_hashes( torrents ) )
 		else:
-			res = self._do_action( 'start', self._get_hashes( torrents ) )
-		self._update_build( res )
+			self._connection.do_action( 'start', self._get_hashes( torrents ) )
 		
 	def torrent_forcestart( self, torrents ):
 		return self.torrent_start( torrents, True )
 
 	def torrent_stop( self, torrents ):
-		res = self._do_action( 'stop', self._get_hashes( torrents ) )
-		self._update_build( res )
+		self._connection.do_action( 'stop', self._get_hashes( torrents ) )
 
 	def torrent_pause( self, torrents ):
-		res = self._do_action( 'pause', self._get_hashes( torrents ) )
-		self._update_build( res )
+		self._connection.do_action( 'pause', self._get_hashes( torrents ) )
 
 	def torrent_resume( self, torrents ):
-		res = self._do_action( 'unpause', self._get_hashes( torrents ) )
-		self._update_build( res )
+		self._connection.do_action( 'unpause', self._get_hashes( torrents ) )
 
 	def torrent_recheck( self, torrents ):
-		res = self._do_action( 'recheck', self._get_hashes( torrents ) )
-		self._update_build( res )
+		self._connection.do_action( 'recheck', self._get_hashes( torrents ) )
 
 	def torrent_remove( self, torrents, with_data = False ):
 		if with_data:
-			res = self._do_action( 'removedata', self._get_hashes( torrents ) )
+			self._connection.do_action( 'removedata', self._get_hashes( torrents ) )
 		else:
-			res = self._do_action( 'remove', self._get_hashes( torrents ) )
-		self._update_build( res )
+			self._connection.do_action( 'remove', self._get_hashes( torrents ) )
 		
 	def torrent_remove_with_data( self, torrents ):
 		return self.torrent_remove( torrents, True )
 
 	def file_list( self, torrents ):
-		res = self._do_action( 'getfiles', self._get_hashes( torrents ) )
-		self._update_build( res )
+		res = self._connection.do_action( 'getfiles', self._get_hashes( torrents ) )
 		out = {}
 		fi = iter( res[ 'files' ] );
 		for hash in fi:
@@ -435,13 +507,10 @@ class uTorrent:
 				prio = Priority( prio )
 			parent_hash, index = hash.split( '.', 1 )
 			args.append( 'hash={}&p={}&f={}'.format( quote( parent_hash, ''), quote( str( prio.priority ), '' ), quote( index, '' ) ) )
-			res = self._do_action( 'setprio', params_str = '&'.join( args ) )
-		self._update_build( res )
-			
+			self._connection.do_action( 'setprio', params_str = '&'.join( args ) )
 	
 	def settings_get( self ):
-		res = self._do_action( 'getsettings' )
-		self._update_build( res )
+		res = self._connection.do_action( 'getsettings' )
 		out = {}
 		for name, type, value in res[ 'settings' ]:
 			out[ name ] = self._setting_val( type, value )
@@ -453,20 +522,54 @@ class uTorrent:
 			if isinstance( v, bool ):
 				v = int( v )
 			args.append( 's={}&v={}'.format( quote( k, '' ), quote( str( v ), '' ) ) )
-		res = self._do_action( 'setsetting', params_str = '&'.join( args ) )
-		self._update_build( res )
+		self._connection.do_action( 'setsetting', params_str = '&'.join( args ) )
 
 		
 class uTorrentServer( uTorrent ):
 	
-	_path_module = posixpath
+	_TorrentClass = Torrent_Server
 	
-	def get_server_version( self ):
-		res = self._do_action( 'getversion' )
-		print( res )
+	_pathmodule = posixpath
+	
+	api_version = 2
+	
+	def settings_get( self, extended_attributes = False ):
+		res = self._connection.do_action( 'getsettings' )
+		out = {}
+		for name, type, value, attrs in res[ 'settings' ]:
+			out[ name ] = self._setting_val( type, value )
+		return out
+
+	def version( self ):
+		if not self._version:
+			self._version = Version( self._connection.do_action( 'getversion' ) )
+		return self._version
+
+	def torrent_remove( self, torrents, with_data = False, with_torrent = False ):
+		if with_data:
+			if with_torrent:
+				self._connection.do_action( 'removedatatorrent', self._get_hashes( torrents ) )
+			else:
+				self._connection.do_action( 'removedata', self._get_hashes( torrents ) )
+		else:
+			if with_torrent:
+				self._connection.do_action( 'removetorrent', self._get_hashes( torrents ) )
+			else:
+				self._connection.do_action( 'remove', self._get_hashes( torrents ) )
 		
-def ut_connect( host, login, password ):
-	return uTorrent( host, login, password )
+	def torrent_remove_with_torrent( self, torrents ):
+		return self.torrent_remove( torrents, False, True )
+
+	def torrent_remove_with_data_torrent( self, torrents ):
+		return self.torrent_remove( torrents, True, True )
+	
+	def get_file( self, file ):
+		if isinstance( file, File ):
+			file = file.hash
+		parent_hash, index = file.split( '.', 1 )
+#		args.append( 'hash={}&p={}&f={}'.format( quote( parent_hash, ''), quote( str( prio.priority ), '' ), quote( index, '' ) ) )
+#		self._connection.do_action( 'setprio', params_str = '&'.join( args ) )
+		
 
 if __name__ == '__main__':
 	
@@ -479,6 +582,7 @@ if __name__ == '__main__':
 	parser.add_option( '-H', '--host', dest = 'host', default = utorrentcfg[ 'host' ], help = 'host of uTorrent (hostname:port)' )
 	parser.add_option( '-u', '--user', dest = 'user', default = utorrentcfg[ 'login' ], help = 'user name' )
 	parser.add_option( '-p', '--password', dest = 'password', default = utorrentcfg[ 'password' ], help = 'user password' )
+	parser.add_option( '--server-version', action = 'store_const', dest = 'action', const = 'server_version', help = 'print uTorrent server version' )
 	parser.add_option( '-l', '--list-torrents', action = 'store_const', dest = 'action', const = 'torrent_list', help = 'list all torrents' )
 	parser.add_option( '-a', '--add-file', action = 'store_const', dest = 'action', const = 'add_file', help = 'add torrents specified by local file names' )
 	parser.add_option( '--add-url', action = 'store_const', dest = 'action', const = 'add_url', help = 'add torrents specified by urls' )
@@ -492,19 +596,24 @@ if __name__ == '__main__':
 	parser.add_option( '--recheck', action = 'store_const', dest = 'action', const = 'torrent_recheck', help = 'recheck torrents, torrent must be stopped first (hash hash ...)' )
 	parser.add_option( '--remove', action = 'store_const', dest = 'action', const = 'torrent_remove', help = 'remove torrents (hash hash ...)' )
 	parser.add_option( '--force', action = 'store_true', dest = 'force', help = 'forces current command (only for --start)' )
-	parser.add_option( '--with-data', action = 'store_true', dest = 'with_data', help = 'when removing torrent also remove its data (only for --remove)' )
+	parser.add_option( '--data', action = 'store_true', dest = 'with_data', help = 'when removing torrent also remove its data (only for --remove)' )
+	parser.add_option( '--torrent', action = 'store_true', dest = 'with_torrent', help = 'when removing torrent also remove its torrent file (only for --remove and uTorrent server)' )
 	parser.add_option( '-f', '--list-files', action = 'store_const', dest = 'action', const = 'file_list', help = 'displays file list within torrents (hash hash ...)' )
 	parser.add_option( '--set-file-priority', action = 'store_const', dest = 'action', const = 'set_file_priority', help = 'sets specified file priority (hash.file_index=prio hash.file_index=prio ...) prio=0..3' )
+	parser.add_option( '-d', '--download', action = 'store_const', dest = 'action', const = 'download_file', help = 'downloads specified file (hash.file_index destination_file)' )
 	opts, args = parser.parse_args()
 	
-	k, v = 0, 0 # for pydev, fixed in 1.6.3
+	k, v = 0, 0 # for pydev, will be fixed in 1.6.3
 	
 	try:
 
 		if opts.action != None:
-			utorrent = ut_connect( opts.host, opts.user, opts.password )
+			utorrent = uTorrentConnection( opts.host, opts.user, opts.password ).utorrent()
+			
+		if opts.action == 'server_version':
+			print_term( utorrent.version() )
 	
-		if opts.action == 'torrent_list':
+		elif opts.action == 'torrent_list':
 			for i in utorrent.torrent_list():
 				print_term( i )
 	
@@ -554,7 +663,10 @@ if __name__ == '__main__':
 		elif opts.action == 'torrent_remove':
 			for i in args:
 				print( 'Removing {}...'.format( i ) )
-				utorrent.torrent_remove( i, opts.with_data )
+				if utorrent.api_version == 1:
+					utorrent.torrent_remove( i, opts.with_data )
+				elif utorrent.api_version == 2:
+					utorrent.torrent_remove( i, opts.with_data, opts.with_torrent )
 	
 		elif opts.action == 'file_list':
 			for i in args:
@@ -562,7 +674,7 @@ if __name__ == '__main__':
 					print_term( 'Torrent: ' + h )
 					for f in fs:
 						print_term( ' + ' + str( f ) )
-	
+
 		elif opts.action == 'set_file_priority':
 			utorrent.file_set_priority( { k : v for k, v in [ i.split( '=' ) for i in args ] } )
 	

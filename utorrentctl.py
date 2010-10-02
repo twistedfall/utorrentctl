@@ -215,10 +215,9 @@ class uTorrent:
 	_token = ''
 	
 	_retry_max = 3
-	_pathmodule = None
+	_pathmodule = ntpath
 	
 	def __init__( self, host, login, password ):
-		self._pathmodule = ntpath
 		self.connect( host, login, password )
 		
 	def _get_data( self, loc, data = None, retry = True ):
@@ -459,6 +458,8 @@ class uTorrent:
 
 		
 class uTorrentServer( uTorrent ):
+	
+	_path_module = posixpath
 	
 	def get_server_version( self ):
 		res = self._do_action( 'getversion' )

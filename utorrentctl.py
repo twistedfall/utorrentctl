@@ -220,7 +220,7 @@ class uTorrent:
 		
 	def _get_data( self, loc, data = None, retry = True ):
 		last_e = None
-		for i in range( self._retry_max if not retry else 1 ):
+		for i in range( self._retry_max if retry else 1 ):
 			try:
 				h = self._opener.open( self._opurl + loc, data )
 				out = h.read().decode( 'utf8' )
@@ -231,10 +231,12 @@ class uTorrent:
 					raise uTorrentError( 'Invalid request' )
 				elif e.code == 110: # Connection timed out
 					print( 'retry' )
+					last_e = e
 					pass
 				else:
 					raise e
-		raise last_e
+		if last_e:
+			raise last_e
 	
 	@staticmethod
 	def _setting_val( type, value ):

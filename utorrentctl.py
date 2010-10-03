@@ -663,7 +663,6 @@ if __name__ == '__main__':
 	parser.add_option( '--torrent', action = 'store_true', dest = 'with_torrent', help = 'when removing torrent also remove its torrent file (only for --remove and uTorrent server)' )
 	parser.add_option( '-f', '--list-files', action = 'store_const', dest = 'action', const = 'file_list', help = 'displays file list within torrents (hash hash ...)' )
 	parser.add_option( '--set-file-priority', action = 'store_const', dest = 'action', const = 'set_file_priority', help = 'sets specified file priority (hash.file_index=prio hash.file_index=prio ...) prio=0..3' )
-	parser.add_option( '-d', '--download', action = 'store_const', dest = 'action', const = 'download_file', help = 'downloads specified file (hash.file_index destination_file)' )
 	opts, args = parser.parse_args()
 	
 	k, v = 0, 0 # for pydev, will be fixed in 1.6.3

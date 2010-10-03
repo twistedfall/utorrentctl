@@ -61,7 +61,9 @@ class Version:
 	
 	def __str__( self ):
 		return self.user_agent
-			
+	
+	def verbose_str( self ):
+		return str( self )
 
 class TorrentStatus:
 	

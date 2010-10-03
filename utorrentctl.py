@@ -50,7 +50,7 @@ class Version:
 			self.engine = res[ 'version' ][ 'engine_version' ]
 			self.ui = res[ 'version' ][ 'ui_version' ]
 			date = res[ 'version' ][ 'version_date' ].split( ' ' )
-			self.date = datetime.datetime( *list( map( int, date[ 0 ].split( '-' ) ) ) + list( map( int, date[ 1 ].split( ':' ) ) ) )
+			self.date = datetime.datetime( *map( int, date[ 0 ].split( '-' ) + date[ 1 ].split( ':' ) ) )
 			self.user_agent = res[ 'version' ][ 'user_agent' ]
 			self.peer_id = res[ 'version' ][ 'peer_id' ]
 			self.device_id = res[ 'version' ][ 'device_id' ]

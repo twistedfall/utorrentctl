@@ -619,12 +619,12 @@ if __name__ == '__main__':
 	
 		elif opts.action == 'add_file':
 			for i in args:
-				print( 'Submitting {}...'.format( i ) )
+				print_term( 'Submitting {}...'.format( i ) )
 				utorrent.torrent_add_file( i, opts.dir )
 	
 		elif opts.action == 'add_url':
 			for i in args:
-				print( 'Submitting {}...'.format( i ) )
+				print_term( 'Submitting {}...'.format( i ) )
 				utorrent.torrent_add_url( i, opts.dir )
 	
 		elif opts.action == 'settings_get':
@@ -637,32 +637,32 @@ if __name__ == '__main__':
 			
 		elif opts.action == 'torrent_start':
 			for i in args:
-				print( 'Starting {}...'.format( i ) )
+				print_term( 'Starting {}...'.format( i ) )
 				utorrent.torrent_start( i, opts.force )
 	
 		elif opts.action == 'torrent_stop':
 			for i in args:
-				print( 'Stopping {}...'.format( i ) )
+				print_term( 'Stopping {}...'.format( i ) )
 				utorrent.torrent_stop( i )
 	
 		elif opts.action == 'torrent_resume':
 			for i in args:
-				print( 'Resuming {}...'.format( i ) )
+				print_term( 'Resuming {}...'.format( i ) )
 				utorrent.torrent_resume( i )
 	
 		elif opts.action == 'torrent_pause':
 			for i in args:
-				print( 'Pausing {}...'.format( i ) )
+				print_term( 'Pausing {}...'.format( i ) )
 				utorrent.torrent_pause( i )
 	
 		elif opts.action == 'torrent_recheck':
 			for i in args:
-				print( 'Queuing recheck {}...'.format( i ) )
+				print_term( 'Queuing recheck {}...'.format( i ) )
 				utorrent.torrent_recheck( i )
 	
 		elif opts.action == 'torrent_remove':
 			for i in args:
-				print( 'Removing {}...'.format( i ) )
+				print_term( 'Removing {}...'.format( i ) )
 				if utorrent.api_version == 1:
 					utorrent.torrent_remove( i, opts.with_data )
 				elif utorrent.api_version == 2:
@@ -673,8 +673,8 @@ if __name__ == '__main__':
 				for h, fs in utorrent.file_list( i ).items():
 					print_term( 'Torrent: ' + h )
 					for f in fs:
-						print_term( ' + ' + str( f ) )
-
+						print_term( ' + ' + strException( f ) )
+	
 		elif opts.action == 'set_file_priority':
 			utorrent.file_set_priority( { k : v for k, v in [ i.split( '=' ) for i in args ] } )
 	

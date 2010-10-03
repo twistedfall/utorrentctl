@@ -431,7 +431,7 @@ class uTorrent:
 	
 	def torrent_list( self, labels = None ):
 		res = self._connection.do_action( 'list' )
-		out = [ self._TorrentClass( i, self ) for i in res[ 'torrents' ] ]
+		out = { k : v for k, v in [ ( i[ 0 ], self._TorrentClass( i, self ) ) for i in res[ 'torrents' ] ] }
 		if labels != None:
 			labels.extend( [ Label( i ) for i in res[ 'label' ] ] )
 #		if rss_feeds != None:
@@ -614,8 +614,8 @@ if __name__ == '__main__':
 			print_term( utorrent.version() )
 	
 		elif opts.action == 'torrent_list':
-			for i in utorrent.torrent_list():
-				print_term( i )
+			for h, t in sorted( utorrent.torrent_list().items(), key = lambda x: x[ 1 ].name ):
+				print_term( t )
 	
 		elif opts.action == 'add_file':
 			for i in args:

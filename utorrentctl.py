@@ -192,23 +192,23 @@ class Label:
 
 class Priority:
 	
-	priority = 0
+	value = 0
 	
-	def __init__( self, priority ):
-		priority = int( priority )
-		if priority in range( 4 ):
-			self.priority = priority
+	def __init__( self, value ):
+		value = int( value )
+		if value in range( 4 ):
+			self.value = value
 		else:
-			self.priority = 1
+			self.value = 2
 
 	def __str__( self ):
-		if self.priority == 0:
+		if self.value == 0:
 			return 'don\'t download'
-		elif self.priority == 1:
+		elif self.value == 1:
 			return 'low priority'
-		elif self.priority == 2:
+		elif self.value == 2:
 			return 'normal priority'
-		elif self.priority == 3:
+		elif self.value == 3:
 			return 'high priority'
 		else:
 			return 'unknown priority'
@@ -226,7 +226,7 @@ class File:
 	size_h = ''
 	downloaded = 0
 	downloaded_h = ''
-	priority = 0
+	priority = None
 	progress = 0.
 	
 	def __init__( self, file, index, parent_hash, utorrent ):
@@ -506,7 +506,7 @@ class uTorrent:
 			if not isinstance( prio, Priority ):
 				prio = Priority( prio )
 			parent_hash, index = hash.split( '.', 1 )
-			args.append( 'hash={}&p={}&f={}'.format( quote( parent_hash, ''), quote( str( prio.priority ), '' ), quote( index, '' ) ) )
+			args.append( 'hash={}&p={}&f={}'.format( quote( parent_hash, ''), quote( str( prio.value ), '' ), quote( index, '' ) ) )
 			self._connection.do_action( 'setprio', params_str = '&'.join( args ) )
 	
 	def settings_get( self ):
@@ -567,7 +567,7 @@ class uTorrentServer( uTorrent ):
 		if isinstance( file, File ):
 			file = file.hash
 		parent_hash, index = file.split( '.', 1 )
-#		args.append( 'hash={}&p={}&f={}'.format( quote( parent_hash, ''), quote( str( prio.priority ), '' ), quote( index, '' ) ) )
+#		args.append( 'hash={}&p={}&f={}'.format( quote( parent_hash, ''), quote( str( prio.value ), '' ), quote( index, '' ) ) )
 #		self._connection.do_action( 'setprio', params_str = '&'.join( args ) )
 		
 

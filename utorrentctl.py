@@ -681,6 +681,6 @@ if __name__ == '__main__':
 		else:
 			parser.print_help()
 
-	except Exception as e:
+	except uTorrentError as e:
 		print_term( e )
 		sys.exit( 1 )

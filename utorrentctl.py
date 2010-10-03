@@ -2,7 +2,7 @@
 
 """
 	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
+	it under the terms of the GNU Lesser General Public License as published by
 	the Free Software Foundation, either version 3 of the License, or
 	(at your option) any later version.
 
@@ -16,7 +16,7 @@
 """
 
 """
-	utorrentctl - uTorrent cli remote control utility
+	utorrentctl - uTorrent cli remote control utility and library
 """
 
 import urllib.request, http.client, http.cookiejar, socket

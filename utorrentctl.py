@@ -113,7 +113,7 @@ class Torrent:
 	status = None
 	name = ''
 	size = 0
-	progress = 0. # in percents
+	progress = 0. # in percent
 	downloaded = 0
 	uploaded = 0
 	ratio = 0.
@@ -361,7 +361,7 @@ class uTorrent:
 	
 	_pathmodule = ntpath
 	
-	api_version = 1
+	api_version = 1 # http://forum.utorrent.com/viewtopic.php?id=25661
 	
 	def __init__( self, connection, version = None ):
 		self._connection = connection
@@ -531,7 +531,7 @@ class uTorrentServer( uTorrent ):
 	
 	_pathmodule = posixpath
 	
-	api_version = 2
+	api_version = 2 # http://download.utorrent.com/linux/utorrent-server-3.0-21886.tar.gz:bittorrent-server-v3_0/docs/uTorrent_Server.html
 	
 	def settings_get( self, extended_attributes = False ):
 		res = self._connection.do_action( 'getsettings' )

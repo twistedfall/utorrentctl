@@ -22,7 +22,10 @@
 import urllib.request, http.client, http.cookiejar, socket
 import re, json, base64, posixpath, ntpath, email.generator, os.path, datetime, errno
 from urllib.parse import quote
-from config import utorrentcfg
+try:
+	from config import utorrentcfg
+except ImportError:
+	utorrentcfg = { 'host' : None, 'login' : None, 'password' : None  }
 
 class uTorrentError( Exception ):
 	pass

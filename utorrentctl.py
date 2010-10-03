@@ -342,14 +342,16 @@ class uTorrentConnection( http.client.HTTPConnection ):
 				if len( self._cookies ) > 0:
 					self._request.add_header( 'Cookie', '; '.join( [ '{}={}'.format( quote( c.name, '' ), quote( c.value, '' ) ) for c in self._cookies ] ) )
 				return out
+			except socket.gaierror as e:
+				raise uTorrentError( e.args[ 1 ] )
 			except socket.error as e:
 				e = e.args[ 0 ]
-				if e.args[ 0 ] == errno.ECONNREFUSED:
-					self.close()
-					raise uTorrentError( e.args[ 1 ] )
-				elif str( e ) == 'timed out':
+				if str( e ) == 'timed out':
 					last_e = uTorrentError( 'Timeout' )
 					continue
+				elif e.args[ 0 ] == errno.ECONNREFUSED:
+					self.close()
+					raise uTorrentError( e.args[ 1 ] )
 		if last_e:
 			self.close()
 			raise last_e

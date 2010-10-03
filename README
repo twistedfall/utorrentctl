@@ -1,0 +1,15 @@
+Getting Started
+---------------
+
+Download utorrentctl.py and config.py. Edit config.py to edit your connection defaults.
+It's not required, but it's more convenient to have them. Run python utorrentctl.py --help.
+utorrentctl detects that it is run as command line utility and displays usage help. There
+is no documentation at the moment, so for basic usage refer to the example code in
+utorrentctl.py (after if __name__ == '__main__')
+
+
+Requirements
+------------
+
+- Python 3.1+ (http://www.python.org/download/)
+- Any OS (right now only tested on Linux)

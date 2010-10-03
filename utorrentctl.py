@@ -65,6 +65,8 @@ class Version:
 
 class TorrentStatus:
 	
+	_progress = 0
+	
 	started = False
 	checking = False
 	start_after_check = False
@@ -74,7 +76,8 @@ class TorrentStatus:
 	queued = False
 	loaded = False
 	
-	def __init__( self, status ):
+	def __init__( self, status, percent_loaded = 0 ):
+		self._progress = percent_loaded
 		self.started = status & 1
 		self.checking = status & 2
 		self.start_after_check = status & 4
@@ -83,26 +86,43 @@ class TorrentStatus:
 		self.paused = status & 32
 		self.queued = status & 64
 		self.loaded = status & 128
-		
+	
+	# http://forum.utorrent.com/viewtopic.php?pid=381527#p381527
 	def __str__( self ):
-		out = []
-		if self.started:
-			out.append( 'started' )
-		if self.checking:
-			out.append( 'checking' )
-		if self.start_after_check:
-			out.append( 'start after check' )
-		if self.checked:
-			out.append( 'checked' )
+		if not self.loaded:
+			return 'Not loaded'
 		if self.error:
-			out.append( 'error' )
+			return 'Error'
+		if self.checking:
+			return 'Checked {:.1f}%'.format( self._progress )
 		if self.paused:
-			out.append( 'paused' )
-		if self.queued:
-			out.append( 'queued' )
-		if self.loaded:
-			out.append( 'loaded' )
-		return ', '.join( out )
+			if self.queued:
+				return 'Paused'
+			else:
+				return '[F] Paused'
+		if self._progress == 100:
+			if self.queued:
+				if self.started:
+					return 'Seeding'
+				else:
+					return 'Queued Seed'
+			else:
+				if self.started:
+					return '[F] Seeding'
+				else:
+					return 'Finished'
+		else: # self._progress < 100
+			if self.queued:
+				if self.started:
+					return 'Downloading'
+				else:
+					return 'Queued'
+			else:
+				if self.started:
+					return '[F] Downloading'
+#				else:
+#					return 'Stopped'
+		return 'Stopped'
 
 
 class Torrent:
@@ -113,13 +133,19 @@ class Torrent:
 	status = None
 	name = ''
 	size = 0
+	size_h = ''
 	progress = 0. # in percent
 	downloaded = 0
+	downloaded_h = ''
 	uploaded = 0
+	uploaded_h = ''
 	ratio = 0.
 	upspeed = 0
+	upspeed_h = ''
 	downspeed = 0
+	downspeed_h = ''
 	eta = 0
+	eta_h = ''
 	label = ''
 	peers_connected = 0
 	peers_total = 0
@@ -137,10 +163,22 @@ class Torrent:
 			self.queue_order, self.download_remain = torrent
 		self.progress = progress / 10.
 		self.ratio = ratio / 1000.
-		self.status = TorrentStatus( status )
-	
+		self.status = TorrentStatus( status, self.progress )
+		self.size_h = uTorrent.human_size( self.size )
+		self.uploaded_h = uTorrent.human_size( self.uploaded )
+		self.downloaded_h = uTorrent.human_size( self.downloaded )
+		self.upspeed_h = uTorrent.human_size( self.upspeed )
+		self.downspeed_h = uTorrent.human_size( self.downspeed )
+		self.eta_h = uTorrent.human_time_delta( self.eta )
+
 	def __str__( self ):
 		return '{} {}'.format( self.hash, self.name )
+	
+	def verbose_str( self ):
+		return '{} {: <11}{} {: >5.1f}% {: >9} {: >11}|{: >11} eta: {: <7} {}'.format(
+			self.hash, self.status, ' ({})'.format( self.label ) if self.label else '', self.progress, self.size_h,
+			self.upspeed_h, self.downspeed_h, self.eta_h, self.name
+		)
 	
 	def file_list( self ):
 		return self._utorrent.file_list( self )
@@ -173,7 +211,7 @@ class Torrent_Server( Torrent ):
 	def __init__( self, torrent, utorrent ):
 		Torrent.__init__( self, torrent[ 0 : 19 ], utorrent )
 		self.url, self.rss_url, self.status_message, junk = torrent[ 19 : ]
-
+		
 	def remove( self, with_data = False, with_torrent = False ):
 		return self._utorrent.torrent_remove( self, with_data, with_torrent )
 
@@ -386,6 +424,23 @@ class uTorrent:
 				size /= 1024.
 		return "{:.2f}{}".format( size, suffixes[ -1 ] )
 	
+	@staticmethod
+	def human_time_delta( seconds, max_elems = 2 ):
+		if seconds == -1:
+			return '\u221e' # infinity sign
+		out = []
+		reducer = ( ( 60 * 60 * 24 * 7, 'w' ), ( 60 * 60 * 24, 'd' ), ( 60 * 60, 'h' ), ( 60, 'm' ), ( 1, 's') )
+		for d, c in reducer:
+			v = int( seconds / d )
+			seconds -= d * v
+			if v or len( out ) > 0:
+				out.append( '{}{}'.format( v, c ) )
+			if len( out ) == max_elems:
+				break
+		if len( out ) == 0:
+			out.append( '0{}'.format( reducer[ - 1][ 1 ] ) )
+		return ' '.join( out )
+	
 	def _create_torrent_upload( self, torrent_data, torrent_filename ):
 		out = '\r\n'.join( (
 			'--{{BOUNDARY}}',
@@ -582,6 +637,7 @@ if __name__ == '__main__':
 	parser.add_option( '-H', '--host', dest = 'host', default = utorrentcfg[ 'host' ], help = 'host of uTorrent (hostname:port)' )
 	parser.add_option( '-u', '--user', dest = 'user', default = utorrentcfg[ 'login' ], help = 'user name' )
 	parser.add_option( '-p', '--password', dest = 'password', default = utorrentcfg[ 'password' ], help = 'user password' )
+	parser.add_option( '-v', '--verbose', action = 'store_true', dest = 'verbose', help = 'show extended info in the output' )
 	parser.add_option( '--server-version', action = 'store_const', dest = 'action', const = 'server_version', help = 'print uTorrent server version' )
 	parser.add_option( '-l', '--list-torrents', action = 'store_const', dest = 'action', const = 'torrent_list', help = 'list all torrents' )
 	parser.add_option( '-a', '--add-file', action = 'store_const', dest = 'action', const = 'add_file', help = 'add torrents specified by local file names' )
@@ -611,11 +667,17 @@ if __name__ == '__main__':
 			utorrent = uTorrentConnection( opts.host, opts.user, opts.password ).utorrent()
 			
 		if opts.action == 'server_version':
-			print_term( utorrent.version() )
+			if opts.verbose:
+				print_term( utorrent.version().verbose_str() )
+			else:
+				print_term( utorrent.version() )
 	
 		elif opts.action == 'torrent_list':
 			for h, t in sorted( utorrent.torrent_list().items(), key = lambda x: x[ 1 ].name ):
-				print_term( t )
+				if opts.verbose:
+					print_term( t.verbose_str() )
+				else:
+					print_term( t )
 	
 		elif opts.action == 'add_file':
 			for i in args:
@@ -673,7 +735,7 @@ if __name__ == '__main__':
 				for h, fs in utorrent.file_list( i ).items():
 					print_term( 'Torrent: ' + h )
 					for f in fs:
-						print_term( ' + ' + strException( f ) )
+						print_term( ' + ' + str( f ) )
 	
 		elif opts.action == 'set_file_priority':
 			utorrent.file_set_priority( { k : v for k, v in [ i.split( '=' ) for i in args ] } )

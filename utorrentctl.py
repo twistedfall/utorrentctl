@@ -184,9 +184,9 @@ class Torrent:
 		return '{} {}'.format( self.hash, self.name )
 	
 	def verbose_str( self ):
-		return '{} {: <11}{} {: >5.1f}% {: >9} {: >11}/s|{: >11}/s eta: {: <7} {}'.format(
+		return '{} {: <11}{} {: >5.1f}% {: >9} D:{: >11}/s U:{: >11}/s eta: {: <7} {}'.format(
 			self.hash, self.status, ' ({})'.format( self.label ) if self.label else '', self.progress, self.size_h,
-			self.upspeed_h, self.downspeed_h, self.eta_h, self.name
+			self.downspeed_h, self.upspeed_h, self.eta_h, self.name
 		)
 	
 	def file_list( self ):
@@ -691,7 +691,7 @@ if __name__ == '__main__':
 				else:
 					print_term( t )
 			if opts.verbose:
-				print_term( 'Total speed: {}/s | {}/s'.format( uTorrent.human_size( total_up ), uTorrent.human_size( total_down ) ) )
+				print_term( 'Total speed: D:{}/s U:{}/s'.format( uTorrent.human_size( total_down ), uTorrent.human_size( total_up ) ) )
 	
 		elif opts.action == 'add_file':
 			for i in args:

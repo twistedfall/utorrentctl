@@ -357,6 +357,9 @@ class uTorrentConnection( http.client.HTTPConnection ):
 				elif e.args[ 0 ] == errno.ECONNREFUSED:
 					self.close()
 					raise uTorrentError( e.args[ 1 ] )
+			except http.client.CannotSendRequest as e:
+				last_e = uTorrentError( 'Cannot send request' )
+				self.close()
 		if last_e:
 			self.close()
 			raise last_e

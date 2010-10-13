@@ -469,7 +469,7 @@ class uTorrent:
 		return out
 	
 	def _get_hashes( self, torrents ):
-		if not isinstance( torrents, ( tuple, list ) ):
+		if not hasattr( torrents, '__iter__' ):
 			torrents = ( torrents, )
 		out = []
 		for t in torrents:
@@ -666,9 +666,10 @@ if __name__ == '__main__':
 	parser.add_option( '--resume', action = 'store_const', dest = 'action', const = 'torrent_resume', help = 'resume torrents (hash hash ...)' )
 	parser.add_option( '--recheck', action = 'store_const', dest = 'action', const = 'torrent_recheck', help = 'recheck torrents, torrent must be stopped first (hash hash ...)' )
 	parser.add_option( '--remove', action = 'store_const', dest = 'action', const = 'torrent_remove', help = 'remove torrents (hash hash ...)' )
-	parser.add_option( '--force', action = 'store_true', dest = 'force', help = 'forces current command (only for --start)' )
-	parser.add_option( '--data', action = 'store_true', dest = 'with_data', help = 'when removing torrent also remove its data (only for --remove)' )
-	parser.add_option( '--torrent', action = 'store_true', dest = 'with_torrent', help = 'when removing torrent also remove its torrent file (only for --remove and uTorrent server)' )
+	parser.add_option( '--all', action = 'store_true', dest = 'all', help = 'applies action to all torrents (only for start, stop, pause and resume)' )
+	parser.add_option( '--force', action = 'store_true', dest = 'force', help = 'forces current command (only for start)' )
+	parser.add_option( '--data', action = 'store_true', dest = 'with_data', help = 'when removing torrent also remove its data (only for remove)' )
+	parser.add_option( '--torrent', action = 'store_true', dest = 'with_torrent', help = 'when removing torrent also remove its torrent file (only for remove with uTorrent server)' )
 	parser.add_option( '-f', '--list-files', action = 'store_const', dest = 'action', const = 'file_list', help = 'displays file list within torrents (hash hash ...)' )
 	parser.add_option( '--set-file-priority', action = 'store_const', dest = 'action', const = 'set_file_priority', help = 'sets specified file priority (hash.file_index=prio hash.file_index=prio ...) prio=0..3' )
 	opts, args = parser.parse_args()
@@ -715,24 +716,36 @@ if __name__ == '__main__':
 			utorrent.settings_set( { k : v for k, v in [ i.split( '=' ) for i in args ] } )
 			
 		elif opts.action == 'torrent_start':
-			for i in args:
-				print_term( 'Starting {}...'.format( i ) )
-				utorrent.torrent_start( i, opts.force )
+			if opts.all:
+				args = utorrent.torrent_list().keys()
+				print_term( 'Starting all torrents...' )
+			else:
+				print_term( 'Starting ' + ', '.join( args ) + '...' )
+			utorrent.torrent_start( args, opts.force )
 	
 		elif opts.action == 'torrent_stop':
-			for i in args:
-				print_term( 'Stopping {}...'.format( i ) )
-				utorrent.torrent_stop( i )
+			if opts.all:
+				args = utorrent.torrent_list().keys()
+				print_term( 'Stopping all torrents...' )
+			else:
+				print_term( 'Stopping ' + ', '.join( args ) + '...' )
+			utorrent.torrent_stop( args )
 	
 		elif opts.action == 'torrent_resume':
-			for i in args:
-				print_term( 'Resuming {}...'.format( i ) )
-				utorrent.torrent_resume( i )
+			if opts.all:
+				args = utorrent.torrent_list().keys()
+				print_term( 'Resuming all torrents...' )
+			else:
+				print_term( 'Resuming ' + ', '.join( args ) + '...' )
+			utorrent.torrent_resume( args )
 	
 		elif opts.action == 'torrent_pause':
-			for i in args:
-				print_term( 'Pausing {}...'.format( i ) )
-				utorrent.torrent_pause( i )
+			if opts.all:
+				args = utorrent.torrent_list().keys()
+				print_term( 'Pausing all torrents...' )
+			else:
+				print_term( 'Pausing ' + ', '.join( args ) + '...' )
+			utorrent.torrent_pause( args )
 	
 		elif opts.action == 'torrent_recheck':
 			for i in args:

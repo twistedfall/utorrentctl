@@ -431,10 +431,10 @@ class uTorrent:
 	def human_size( size, suffixes = ( 'B', 'kiB', 'MiB', 'GiB', 'TiB' ) ):
 		for s in suffixes:
 			if size < 1024:
-				return "{:.2f}{}".format( size, s )
+				return "{:.2f}{}".format( round( size, 2 ), s )
 			if s != suffixes[ -1 ]:
 				size /= 1024.
-		return "{:.2f}{}".format( size, suffixes[ -1 ] )
+		return "{:.2f}{}".format( round( size, 2 ), suffixes[ -1 ] )
 	
 	@staticmethod
 	def human_time_delta( seconds, max_elems = 2 ):

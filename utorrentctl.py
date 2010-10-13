@@ -333,7 +333,8 @@ class uTorrentConnection( http.client.HTTPConnection ):
 				out = resp.read().decode( 'utf8' )
 				if resp.status == 400:
 					last_e = uTorrentError( out )
-					if type( self._utorrent ) == uTorrentServer: # if uTorrent server alpha is bound to the same port as WebUI then it will respond with 'invalid request' to the first request in the connection
+					# if uTorrent server alpha is bound to the same port as WebUI then it will respond with 'invalid request' to the first request in the connection
+					if not self._utorrent or type( self._utorrent ) == uTorrentServer:
 						continue
 					raise last_e
 				elif resp.status == 404:

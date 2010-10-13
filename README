@@ -13,3 +13,20 @@ Requirements
 
 - Python 3.1+ (http://www.python.org/download/)
 - Any OS (right now only tested on Linux)
+
+
+Help
+----
+
+Option --dir needs some clarification. When specified with --add it changes download directory
+only for torrent being added. It accepts both full path and relative path. Full path is pretty
+self-explanatory, but relative path is rather tricky. Suppose we have the following:
+
+  download_dir = /home/user/downloads
+  --dir=movie
+
+then program will strip last path of download_dir (it will become /home/user) and will add
+specified dir to it, thus it will become /home/user/movie
+
+Such behavior allows you to have a single directory where most of your torrent go, but
+gives you the possibility to change it download_dir to some top-level directory temporary.

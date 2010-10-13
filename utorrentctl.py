@@ -670,8 +670,6 @@ if __name__ == '__main__':
 	parser.add_option( '--set-file-priority', action = 'store_const', dest = 'action', const = 'set_file_priority', help = 'sets specified file priority (hash.file_index=prio hash.file_index=prio ...) prio=0..3' )
 	opts, args = parser.parse_args()
 	
-	k, v = 0, 0 # for pydev, will be fixed in 1.6.3
-	
 	try:
 
 		if opts.action != None:

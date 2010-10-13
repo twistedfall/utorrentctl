@@ -439,7 +439,7 @@ class uTorrent:
 	@staticmethod
 	def human_time_delta( seconds, max_elems = 2 ):
 		if seconds == -1:
-			return '\u221e' # infinity sign
+			return 'inf'
 		out = []
 		reducer = ( ( 60 * 60 * 24 * 7, 'w' ), ( 60 * 60 * 24, 'd' ), ( 60 * 60, 'h' ), ( 60, 'm' ), ( 1, 's') )
 		for d, c in reducer:

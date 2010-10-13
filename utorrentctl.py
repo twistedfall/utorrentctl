@@ -58,15 +58,19 @@ class Version:
 			self.peer_id = res[ 'version' ][ 'peer_id' ]
 			self.device_id = res[ 'version' ][ 'device_id' ]
 		else:
+			# fill some partially made up values as desktop client doesn't provide full info, only build 
 			self.product = 'desktop'
-			self.build = res[ 'build' ]
+			self.major = 2
+			self.minor = 4
+			self.build = self.engine = self.ui = res[ 'build' ]
 			self.user_agent = 'BTWebClient/2040({})'.format( self.build )
+			self.peer_id = 'UT2040'
 	
 	def __str__( self ):
 		return self.user_agent
 	
 	def verbose_str( self ):
-		return str( self )
+		return '{} {}/{} {} v{}.0.{}.{}, engine v{}, ui v{}'.format( self.user_agent, self.device_id, self.peer_id, self.product, self.major, self.minor, self.build, self.engine, self.ui )
 
 class TorrentStatus:
 	

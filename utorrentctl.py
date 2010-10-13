@@ -184,7 +184,7 @@ class Torrent:
 		return '{} {}'.format( self.hash, self.name )
 	
 	def verbose_str( self ):
-		return '{} {: <11}{} {: >5.1f}% {: >9} {: >11}|{: >11} eta: {: <7} {}'.format(
+		return '{} {: <11}{} {: >5.1f}% {: >9} {: >11}/s|{: >11}/s eta: {: <7} {}'.format(
 			self.hash, self.status, ' ({})'.format( self.label ) if self.label else '', self.progress, self.size_h,
 			self.upspeed_h, self.downspeed_h, self.eta_h, self.name
 		)

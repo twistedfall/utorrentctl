@@ -469,7 +469,7 @@ class uTorrent:
 		return out
 	
 	def _get_hashes( self, torrents ):
-		if not hasattr( torrents, '__iter__' ):
+		if not hasattr( torrents, '__iter__' ) or isinstance( torrents, str ):
 			torrents = ( torrents, )
 		out = []
 		for t in torrents:

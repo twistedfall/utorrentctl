@@ -682,11 +682,16 @@ if __name__ == '__main__':
 				print_term( utorrent.version() )
 	
 		elif opts.action == 'torrent_list':
+			total_up, total_down = 0, 0
 			for h, t in sorted( utorrent.torrent_list().items(), key = lambda x: x[ 1 ].name ):
 				if opts.verbose:
 					print_term( t.verbose_str() )
+					total_up += t.upspeed
+					total_down += t.downspeed
 				else:
 					print_term( t )
+			if opts.verbose:
+				print_term( 'Total speed: {}/s | {}/s'.format( uTorrent.human_size( total_up ), uTorrent.human_size( total_down ) ) )
 	
 		elif opts.action == 'add_file':
 			for i in args:

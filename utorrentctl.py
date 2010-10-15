@@ -149,10 +149,10 @@ class Torrent:
 	uploaded = 0
 	uploaded_h = ''
 	ratio = 0.
-	upspeed = 0
-	upspeed_h = ''
-	downspeed = 0
-	downspeed_h = ''
+	ul_speed = 0
+	ul_speed_h = ''
+	dl_speed = 0
+	dl_speed_h = ''
 	eta = 0
 	eta_h = ''
 	label = ''
@@ -162,22 +162,22 @@ class Torrent:
 	seeds_total = 0
 	availability = 0
 	queue_order = 0
-	download_remain = 0
+	dl_remain = 0
 
 	def __init__( self, torrent, utorrent ):
 		self._utorrent = utorrent
 		self.hash, status, self.name, self.size, progress, self.downloaded, \
-			self.uploaded, ratio, self.upspeed, self.downspeed, self.eta, self.label, \
+			self.uploaded, ratio, self.ul_speed, self.dl_speed, self.eta, self.label, \
 			self.peers_connected, self.peers_total, self.seeds_connected, self.seeds_total, self.availability, \
-			self.queue_order, self.download_remain = torrent
+			self.queue_order, self.dl_remain = torrent
 		self.progress = progress / 10.
 		self.ratio = ratio / 1000.
 		self.status = TorrentStatus( status, self.progress )
 		self.size_h = uTorrent.human_size( self.size )
 		self.uploaded_h = uTorrent.human_size( self.uploaded )
 		self.downloaded_h = uTorrent.human_size( self.downloaded )
-		self.upspeed_h = uTorrent.human_size( self.upspeed )
-		self.downspeed_h = uTorrent.human_size( self.downspeed )
+		self.ul_speed_h = uTorrent.human_size( self.ul_speed )
+		self.dl_speed_h = uTorrent.human_size( self.dl_speed )
 		self.eta_h = uTorrent.human_time_delta( self.eta )
 
 	def __str__( self ):
@@ -186,7 +186,7 @@ class Torrent:
 	def verbose_str( self ):
 		return '{} {: <11}{} {: >5.1f}% {: >9} D:{: >11}/s U:{: >11}/s eta: {: <7} {}'.format(
 			self.hash, self.status, ' ({})'.format( self.label ) if self.label else '', self.progress, self.size_h,
-			self.downspeed_h, self.upspeed_h, self.eta_h, self.name
+			self.dl_speed_h, self.ul_speed_h, self.eta_h, self.name
 		)
 	
 	def file_list( self ):

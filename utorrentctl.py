@@ -742,6 +742,7 @@ if __name__ == '__main__':
 	parser.add_option( '-V', '--no-verbose', action = 'store_false', dest = 'verbose', default = True, help = 'show shortened info in most cases (quicker, saves network traffic)' )
 	parser.add_option( '--server-version', action = 'store_const', dest = 'action', const = 'server_version', help = 'print uTorrent server version' )
 	parser.add_option( '-l', '--list-torrents', action = 'store_const', dest = 'action', const = 'torrent_list', help = 'list all torrents' )
+	parser.add_option( '--active', action = 'store_true', dest = 'active', default = False, help = 'when listing torrents display only active ones (speed > 0)' )
 	parser.add_option( '-a', '--add-file', action = 'store_const', dest = 'action', const = 'add_file', help = 'add torrents specified by local file names' )
 	parser.add_option( '--add-url', action = 'store_const', dest = 'action', const = 'add_url', help = 'add torrents specified by urls' )
 	parser.add_option( '--dir', dest = 'dir', help = 'directory to download added torrent, if path is relative then it is made relative to current download path parent directory (only for --add)' )
@@ -778,7 +779,8 @@ if __name__ == '__main__':
 			total_ul, total_dl = 0, 0
 			for h, t in sorted( utorrent.torrent_list().items(), key = lambda x: x[ 1 ].name ):
 				if opts.verbose:
-					print( t.verbose_str() )
+					if not opts.active or opts.active and ( t.ul_speed > 0 or t.dl_speed > 0 ):
+						print( t.verbose_str() )
 					total_ul += t.ul_speed
 					total_dl += t.dl_speed
 				else:

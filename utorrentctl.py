@@ -59,7 +59,7 @@ class Version:
 			self.peer_id = res[ 'version' ][ 'peer_id' ]
 			self.device_id = res[ 'version' ][ 'device_id' ]
 		else:
-			# fill some partially made up values as desktop client doesn't provide full info, only build 
+			# fill some partially made up values as desktop client doesn't provide full info, only build
 			self.product = 'desktop'
 			self.major = 2
 			self.minor = 4
@@ -71,7 +71,7 @@ class Version:
 		return self.user_agent
 
 	def verbose_str( self ):
-		return '{} {}/{} {} v{}.0.{}.{}, engine v{}, ui v{}'.format( 
+		return '{} {}/{} {} v{}.0.{}.{}, engine v{}, ui v{}'.format(
 			self.user_agent, self.device_id, self.peer_id, self.product,
 			self.major, self.minor, self.build, self.engine, self.ui
 		)
@@ -183,7 +183,7 @@ class Torrent:
 		return '{} {}'.format( self.hash, self.name )
 
 	def verbose_str( self ):
-		return '{} {: <15}{} {: >5.1f}% {: >9} D:{: >12} U:{: >12} {: <8} eta: {: <7} {}'.format( 
+		return '{} {: <15}{} {: >5.1f}% {: >9} D:{: >12} U:{: >12} {: <8} eta: {: <7} {}'.format(
 			self.hash, self.status, ' ({})'.format( self.label ) if self.label else '', self.progress, self.size_h,
 			self.dl_speed_h + '/s' if self.dl_speed > 0 else '', self.ul_speed_h + '/s' if self.ul_speed > 0 else '',
 			self.ratio, self.eta_h, self.name
@@ -366,7 +366,7 @@ class JobInfo:
 		return 'Limits D:{} U:{}'.format( self.dl_limit, self.ul_limit )
 
 	def verbose_str( self ):
-		return 'Limits D:{} U:{};  Superseed:{};  DHT:{};  PEX:{};  Queuing override:{}  Seed ratio:{};  Seed time:{};  Upload slots:{}'.format( 
+		return 'Limits D:{} U:{};  Superseed:{};  DHT:{};  PEX:{};  Queuing override:{}  Seed ratio:{};  Seed time:{};  Upload slots:{}'.format(
 			self.dl_limit, self.ul_limit, self._tribool_status_str( self.superseed ), self._tribool_status_str( self.dht ),
 			self._tribool_status_str( self.pex ), self._tribool_status_str( self.seed_override ), self.seed_ratio,
 			uTorrent.human_time_delta( self.seed_time ), self.ul_slots
@@ -550,7 +550,7 @@ class uTorrent:
 		return ' '.join( out )
 
 	def _create_torrent_upload( self, torrent_data, torrent_filename ):
-		out = '\r\n'.join( ( 
+		out = '\r\n'.join( (
 			'--{{BOUNDARY}}',
 			'Content-Disposition: form-data; name="torrent_file"; filename="{}"'.format( quote( torrent_filename, '' ) ),
 			'Content-Type: application/x-bittorrent',

@@ -767,9 +767,9 @@ if __name__ == '__main__':
 	parser.add_option( '--desc', action = 'store_true', dest = 'sort_desc', default = False, help = 'sort torrents in descending order' )
 	parser.add_option( '-a', '--add-file', action = 'store_const', dest = 'action', const = 'add_file', help = 'add torrents specified by local file names' )
 	parser.add_option( '--add-url', action = 'store_const', dest = 'action', const = 'add_url', help = 'add torrents specified by urls' )
-	parser.add_option( '--dir', dest = 'dir', help = 'directory to download added torrent, if path is relative then it is made relative to current download path parent directory (only for --add)' )
-	parser.add_option( '-g', '--settings', action = 'store_const', dest = 'action', const = 'settings_get', help = 'show current server settings, optionally you can use specific setting keys (name name ...)' )
-	parser.add_option( '-s', '--set', action = 'store_const', dest = 'action', const = 'settings_set', help = 'assign settings value (key1=value1 key2=value2 ...)' )
+	parser.add_option( '--dir', dest = 'download_dir', help = 'directory to download added torrent, if path is relative then it is made relative to current download path parent directory (only for --add)' )
+	parser.add_option( '--settings', action = 'store_const', dest = 'action', const = 'settings_get', help = 'show current server settings, optionally you can use specific setting keys (name name ...)' )
+	parser.add_option( '--set', action = 'store_const', dest = 'action', const = 'settings_set', help = 'assign settings value (key1=value1 key2=value2 ...)' )
 	parser.add_option( '--start', action = 'store_const', dest = 'action', const = 'torrent_start', help = 'start torrents (hash hash ...)' )
 	parser.add_option( '--stop', action = 'store_const', dest = 'action', const = 'torrent_stop', help = 'stop torrents (hash hash ...)' )
 	parser.add_option( '--pause', action = 'store_const', dest = 'action', const = 'torrent_pause', help = 'pause torrents (hash hash ...)' )
@@ -815,12 +815,12 @@ if __name__ == '__main__':
 		elif opts.action == 'add_file':
 			for i in args:
 				print( 'Submitting {}...'.format( i ) )
-				utorrent.torrent_add_file( i, opts.dir )
+				utorrent.torrent_add_file( i, opts.download_dir )
 
 		elif opts.action == 'add_url':
 			for i in args:
 				print( 'Submitting {}...'.format( i ) )
-				utorrent.torrent_add_url( i, opts.dir )
+				utorrent.torrent_add_url( i, opts.download_dir )
 
 		elif opts.action == 'settings_get':
 			for i in utorrent.settings_get().items():

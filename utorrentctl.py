@@ -759,7 +759,7 @@ if __name__ == '__main__':
 	parser.add_option( '-H', '--host', dest = 'host', default = utorrentcfg[ 'host' ], help = 'host of uTorrent (hostname:port)' )
 	parser.add_option( '-u', '--user', dest = 'user', default = utorrentcfg[ 'login' ], help = 'user name' )
 	parser.add_option( '-p', '--password', dest = 'password', default = utorrentcfg[ 'password' ], help = 'user password' )
-	parser.add_option( '-V', '--no-verbose', action = 'store_false', dest = 'verbose', default = True, help = 'show shortened info in most cases (quicker, saves network traffic)' )
+	parser.add_option( '--nv', '--no-verbose', action = 'store_false', dest = 'verbose', default = True, help = 'show shortened info in most cases (quicker, saves network traffic)' )
 	parser.add_option( '--server-version', action = 'store_const', dest = 'action', const = 'server_version', help = 'print uTorrent server version' )
 	parser.add_option( '-l', '--list-torrents', action = 'store_const', dest = 'action', const = 'torrent_list', help = 'list all torrents' )
 	parser.add_option( '-c', '--active', action = 'store_true', dest = 'active', default = False, help = 'when listing torrents display only active ones (speed > 0)' )

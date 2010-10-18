@@ -813,8 +813,8 @@ if __name__ == '__main__':
 				if opts.verbose:
 					if not opts.active or opts.active and ( t.ul_speed > 0 or t.dl_speed > 0 ):
 						print( t.verbose_str() )
-					total_ul += t.ul_speed
-					total_dl += t.dl_speed
+						total_ul += t.ul_speed
+						total_dl += t.dl_speed
 				else:
 					print( t )
 			if opts.verbose:

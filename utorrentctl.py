@@ -630,6 +630,13 @@ class uTorrent:
 		f.close()
 		self.torrent_add_data( torrent_data, download_dir, os.path.basename( filename ) )
 
+	def torrent_set_label( self, torrents ):
+		label = torrents.pop(0)
+		# Don't know why but it does not deal at all well with multiple hashes
+		# Feel free to fix it if I missed something obvious, until then...
+		for torrent in self._get_hashes( torrents ):
+			self.do_action( 'setprops', { 'hash' : torrent, 's' : 'label', 'v' : label } )
+
 	def torrent_start( self, torrents, force = False ):
 		if force:
 			self.do_action( 'forcestart', { 'hash' : self._get_hashes( torrents ) } )
@@ -784,6 +791,7 @@ if __name__ == '__main__':
 	parser.add_option( '-f', '--list-files', action = 'store_const', dest = 'action', const = 'file_list', help = 'displays file list within torrents (hash hash ...)' )
 	parser.add_option( '-I', '--full-info', action = 'store_const', dest = 'action', const = 'torrent_full_info', help = 'displays full information about torrents (hash hash ...)' )
 	parser.add_option( '--set-file-priority', action = 'store_const', dest = 'action', const = 'set_file_priority', help = 'sets specified file priority (hash.file_index=prio hash.file_index=prio ...) prio=0..3' )
+	parser.add_option( '--set-label', action = 'store_const', dest = 'action', const = 'set_label', help = 'assign label to torrents (label hash hash ...)' )
 	opts, args = parser.parse_args()
 	
 	try:
@@ -932,6 +940,14 @@ if __name__ == '__main__':
 
 		elif opts.action == 'set_file_priority':
 			utorrent.file_set_priority( { k : v for k, v in [ i.split( '=' ) for i in args ] } )
+
+		elif opts.action == 'set_label':
+			if opts.all:
+				args = utorrent.torrent_list().keys()
+				print( 'Setting label ' + args[0] + 'for all torrents...' )
+			else:
+				print( 'Setting label ' + args[0] + ' for ' + ', '.join( args[1:] ) + '...' )
+			utorrent.torrent_set_label( args )
 
 		else:
 			parser.print_help()

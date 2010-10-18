@@ -27,6 +27,7 @@ try:
 except ImportError:
 	utorrentcfg = { 'host' : None, 'login' : None, 'password' : None  }
 
+
 class uTorrentError( Exception ):
 	pass
 
@@ -78,6 +79,8 @@ class Version:
 class TorrentStatus:
 
 	_progress = 0
+	
+	_value = 0
 
 	started = False
 	checking = False
@@ -89,6 +92,7 @@ class TorrentStatus:
 	loaded = False
 
 	def __init__( self, status, percent_loaded = 0 ):
+		self._value = status
 		self._progress = percent_loaded
 		self.started = status & 1
 		self.checking = status & 2
@@ -136,6 +140,9 @@ class TorrentStatus:
 #					return 'Stopped'
 		return 'Stopped'
 
+	def __lt__( self, other ):
+		return self._value < other._value
+
 
 class Torrent:
 
@@ -167,8 +174,22 @@ class Torrent:
 	queue_order = 0
 	dl_remain = 0
 
-	def __init__( self, utorrent, torrent ):
+	def __init__( self, utorrent, torrent = None ):
 		self._utorrent = utorrent
+		if torrent:
+			self.fill( torrent )
+
+	def __str__( self ):
+		return '{} {}'.format( self.hash, self.name )
+
+	def verbose_str( self ):
+		return '{} {: <15}{} {: >5.1f}% {: >9} D:{: >12} U:{: >12} {: <8} eta: {: <7} {}'.format( 
+			self.hash, self.status, ' ({})'.format( self.label ) if self.label else '', self.progress, self.size_h,
+			self.dl_speed_h + '/s' if self.dl_speed > 0 else '', self.ul_speed_h + '/s' if self.ul_speed > 0 else '',
+			self.ratio, self.eta_h, self.name
+		)
+
+	def fill( self, torrent ):
 		self.hash, status, self.name, self.size, progress, self.downloaded, \
 			self.uploaded, ratio, self.ul_speed, self.dl_speed, self.eta, self.label, \
 			self.peers_connected, self.peers_total, self.seeds_connected, self.seeds_total, \
@@ -183,15 +204,9 @@ class Torrent:
 		self.dl_speed_h = uTorrent.human_size( self.dl_speed )
 		self.eta_h = uTorrent.human_time_delta( self.eta )
 
-	def __str__( self ):
-		return '{} {}'.format( self.hash, self.name )
-
-	def verbose_str( self ):
-		return '{} {: <15}{} {: >5.1f}% {: >9} D:{: >12} U:{: >12} eta: {: <7} {}'.format( 
-			self.hash, self.status, ' ({})'.format( self.label ) if self.label else '', self.progress, self.size_h,
-			self.dl_speed_h + '/s' if self.dl_speed > 0 else '', self.ul_speed_h + '/s' if self.ul_speed > 0 else '',
-			self.eta_h, self.name
-		)
+	@classmethod
+	def get_sortable_attrs( cls ):
+		return [ i for i in dir( cls ) if not re.search( '(?:^_|_h$)', i ) and not hasattr( getattr( cls, i ), '__call__' ) ]
 
 	def info( self ):
 		return self._utorrent.torrent_info( self )
@@ -224,10 +239,10 @@ class Torrent_Server( Torrent ):
 	rss_url = ''
 	status_message = ''
 
-	def __init__( self, utorrent, torrent ):
-		Torrent.__init__( self, utorrent, torrent[ 0 : 19 ] )
+	def fill( self, torrent ):
+		Torrent.fill( self, torrent[ 0 : 19 ] )
 		self.url, self.rss_url, self.status_message, junk = torrent[ 19 : ]
-
+	
 	def remove( self, with_data = False, with_torrent = False ):
 		return self._utorrent.torrent_remove( self, with_data, with_torrent )
 
@@ -489,6 +504,11 @@ class uTorrent:
 
 	api_version = 1 # http://forum.utorrent.com/viewtopic.php?id=25661
 
+	@property
+	def TorrentClass( self ):
+		return self._TorrentClass
+
+
 	def __init__( self, connection, version = None ):
 		self._connection = connection
 		self._connection._utorrent = self
@@ -742,7 +762,9 @@ if __name__ == '__main__':
 	parser.add_option( '-V', '--no-verbose', action = 'store_false', dest = 'verbose', default = True, help = 'show shortened info in most cases (quicker, saves network traffic)' )
 	parser.add_option( '--server-version', action = 'store_const', dest = 'action', const = 'server_version', help = 'print uTorrent server version' )
 	parser.add_option( '-l', '--list-torrents', action = 'store_const', dest = 'action', const = 'torrent_list', help = 'list all torrents' )
-	parser.add_option( '--active', action = 'store_true', dest = 'active', default = False, help = 'when listing torrents display only active ones (speed > 0)' )
+	parser.add_option( '-c', '--active', action = 'store_true', dest = 'active', default = False, help = 'when listing torrents display only active ones (speed > 0)' )
+	parser.add_option( '-s', '--sort', default = 'name', dest = 'sort_field', help = 'sort torrents, values are: availability, dl_remain, dl_speed, downloaded, eta, hash, label, name, peers_connected, peers_total, progress, queue_order, ratio, seeds_connected, seeds_total, size, status, ul_speed, uploaded + url, rss_url (for server)' )
+	parser.add_option( '--desc', action = 'store_true', dest = 'sort_desc', default = False, help = 'sort torrents in descending order' )
 	parser.add_option( '-a', '--add-file', action = 'store_const', dest = 'action', const = 'add_file', help = 'add torrents specified by local file names' )
 	parser.add_option( '--add-url', action = 'store_const', dest = 'action', const = 'add_url', help = 'add torrents specified by urls' )
 	parser.add_option( '--dir', dest = 'dir', help = 'directory to download added torrent, if path is relative then it is made relative to current download path parent directory (only for --add)' )
@@ -763,7 +785,7 @@ if __name__ == '__main__':
 	parser.add_option( '-I', '--full-info', action = 'store_const', dest = 'action', const = 'torrent_full_info', help = 'displays full information about torrents (hash hash ...)' )
 	parser.add_option( '--set-file-priority', action = 'store_const', dest = 'action', const = 'set_file_priority', help = 'sets specified file priority (hash.file_index=prio hash.file_index=prio ...) prio=0..3' )
 	opts, args = parser.parse_args()
-
+	
 	try:
 
 		if opts.action != None:
@@ -777,7 +799,9 @@ if __name__ == '__main__':
 
 		elif opts.action == 'torrent_list':
 			total_ul, total_dl = 0, 0
-			for h, t in sorted( utorrent.torrent_list().items(), key = lambda x: x[ 1 ].name ):
+			if not opts.sort_field in utorrent.TorrentClass.get_sortable_attrs():
+				opts.sort_field = 'name'
+			for h, t in sorted( utorrent.torrent_list().items(), key = lambda x: getattr( x[ 1 ], opts.sort_field ), reverse = opts.sort_desc ):
 				if opts.verbose:
 					if not opts.active or opts.active and ( t.ul_speed > 0 or t.dl_speed > 0 ):
 						print( t.verbose_str() )

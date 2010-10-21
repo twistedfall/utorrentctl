@@ -19,9 +19,10 @@
 	utorrentctl - uTorrent cli remote control utility and library
 """
 
-import urllib.request, http.client, http.cookiejar, socket
+import urllib.request, http.client, http.cookiejar, urllib.parse, socket
 import re, json, base64, posixpath, ntpath, email.generator, os.path, datetime, errno
-from urllib.parse import quote
+def url_quote( string ):
+	return urllib.parse.quote( string, '' )
 try:
 	from config import utorrentcfg
 except ImportError:
@@ -183,10 +184,11 @@ class Torrent:
 		return '{} {}'.format( self.hash, self.name )
 
 	def verbose_str( self ):
-		return '{} {: <15}{} {: >5.1f}% {: >9} D:{: >12} U:{: >12} {: <8} eta: {: <7} {}'.format(
+		return '{} {: <15}{} {: >5.1f}% {: >9} D:{: >12} U:{: >12} {: <8} {: <9} eta: {: <7} {}'.format(
 			self.hash, self.status, ' ({})'.format( self.label ) if self.label else '', self.progress, self.size_h,
 			self.dl_speed_h + '/s' if self.dl_speed > 0 else '', self.ul_speed_h + '/s' if self.ul_speed > 0 else '',
-			self.ratio, self.eta_h, self.name
+			self.ratio, '{}({})/{}'.format( self.seeds_connected, self.seeds_total, self.peers_connected ),
+			self.eta_h, self.name
 		)
 
 	def fill( self, torrent ):
@@ -194,6 +196,7 @@ class Torrent:
 			self.uploaded, ratio, self.ul_speed, self.dl_speed, self.eta, self.label, \
 			self.peers_connected, self.peers_total, self.seeds_connected, self.seeds_total, \
 			self.availability, self.queue_order, self.dl_remain = torrent
+		self._utorrent.check_hash( self.hash )
 		self.progress = progress / 10.
 		self.ratio = ratio / 1000.
 		self.status = TorrentStatus( status, self.progress )
@@ -301,6 +304,7 @@ class File:
 
 	def __init__( self, utorrent, parent_hash, index, file = None ):
 		self._utorrent = utorrent
+		self._utorrent.check_hash( parent_hash )
 		self._parent_hash = parent_hash
 		self.index = index
 		self.hash = "{}.{}".format( self._parent_hash, self.index )
@@ -386,19 +390,24 @@ class uTorrentConnection( http.client.HTTPConnection ):
 	_retry_max = 3
 
 	_utorrent = None
+	
+	@property
+	def request_obj( self ):
+		return self._request
 
 	def __init__( self, host, login, password ):
 		self._host = host
 		self._login = login
 		self._password = password
-		self._url = 'http://{}/gui/'.format( self._host )
+		self._url = 'http://{}/'.format( self._host )
 		self._request = urllib.request.Request( self._url )
 		self._request.add_header( 'Authorization', 'Basic ' + base64.b64encode( '{}:{}'.format( self._login, self._password ).encode( 'latin1' ) ).decode( 'ascii' ) )
 		http.client.HTTPConnection.__init__( self, self._request.host, timeout = 10 )
 		self._fetch_token()
 
-	def _get_data( self, loc, data = None, retry = True ):
+	def _get_data( self, loc, data = None, retry = True, save_to_file = None, progress_cb = None ):
 		last_e = None
+		utserver_retries = 0
 		for i in range( self._retry_max if retry else 1 ):
 			try:
 				headers = { k : v for k, v in self._request.header_items() }
@@ -407,24 +416,30 @@ class uTorrentConnection( http.client.HTTPConnection ):
 					headers[ 'Content-Type' ] = 'multipart/form-data; boundary={}'.format( bnd )
 					data = data.replace( '{{BOUNDARY}}', bnd )
 				self._request.add_data( data )
-				self.request( self._request.get_method(), self._request.selector + loc, self._request.get_data(), headers )
+				self.request( self._request.get_method(), self._request.get_selector() + loc, self._request.get_data(), headers )
 				resp = self.getresponse()
+				if save_to_file:
+					while True:
+						buf = resp.read( 10240 )
+						if len( buf ) == 0:
+							break
+						save_to_file.write( buf )
+					return None
 				out = resp.read().decode( 'utf8' )
 				if resp.status == 400:
 					last_e = uTorrentError( out )
 					# if uTorrent server alpha is bound to the same port as WebUI then it will respond with 'invalid request' to the first request in the connection
-					if not self._utorrent or type( self._utorrent ) == uTorrentServer:
+					if ( not self._utorrent or type( self._utorrent ) == uTorrentServer ) and utserver_retries == 0:
+						utserver_retries += 1
 						continue
 					raise last_e
-				elif resp.status == 404:
-					raise uTorrentError( 'Invalid request' )
-				elif resp.status == 401:
-					raise uTorrentError( 'Autorization failed' )
+				elif resp.status == 404 or resp.status == 401:
+					raise uTorrentError( resp.reason )
 				elif resp.status != 200:
 					raise uTorrentError( '{}: {}'.format( resp.reason, resp.status ) )
 				self._cookies.extract_cookies( resp, self._request )
 				if len( self._cookies ) > 0:
-					self._request.add_header( 'Cookie', '; '.join( [ '{}={}'.format( quote( c.name, '' ), quote( c.value, '' ) ) for c in self._cookies ] ) )
+					self._request.add_header( 'Cookie', '; '.join( [ '{}={}'.format( url_quote( c.name ), url_quote( c.value ) ) for c in self._cookies ] ) )
 				return out
 			except socket.gaierror as e:
 				raise uTorrentError( e.args[ 1 ] )
@@ -444,30 +459,38 @@ class uTorrentConnection( http.client.HTTPConnection ):
 			raise last_e
 
 	def _fetch_token( self ):
-		data = self._get_data( 'token.html' )
+		data = self._get_data( 'gui/token.html' )
 		match = re.search( "<div .*?id='token'.*?>(.+?)</div>", data )
 		if match == None:
 			raise uTorrentError( 'Can\'t fetch security token' )
 		self._token = match.group( 1 )
-		self._request = urllib.request.Request( '{}?token={}&'.format( self._request.get_full_url(), quote( self._token, '' ) ), headers = self._request.headers )
 
 	def _action( self, action, params = None, params_str = None ):
-		args = ''
-		if params != None:
+		args = []
+		if params:
 			for k, v in params.items():
 				if isinstance( v, ( tuple, list ) ):
 					for i in v:
-						args += '&{}={}'.format( quote( k, '' ), quote( i, '' ) )
+						args.append( '{}={}'.format( url_quote( str( k ) ), url_quote( str( i ) ) ) )
 				else:
-					args += '&{}={}'.format( quote( k, '' ), quote( v, '' ) )
-		if params_str != None and params_str != '':
-			args += '&' + params_str
-		if action == 'list':
-			return 'list=1' + args
+					args.append( '{}={}'.format( url_quote( str( k ) ), url_quote( str( v ) ) ) )
+		if params_str:
+			params_str = '&' + params_str
 		else:
-			return 'action=' + quote( action, '' ) + args
+			params_str = ''
+		if action == 'list':
+			args.insert( 0, 'token=' + url_quote( self._token ) )
+			args.insert( 1, 'list=1' )
+			section = 'gui/'
+		elif action == 'proxy':
+			section = 'proxy'
+		else:
+			args.insert( 0, 'token=' + url_quote( self._token ) )
+			args.insert( 1, 'action=' + url_quote( str( action ) ) )
+			section = 'gui/'
+		return section + '?' + '&'.join( args ) + params_str
 
-	def do_action( self, action, params = None, params_str = None, data = None, retry = True ):
+	def do_action( self, action, params = None, params_str = None, data = None, retry = True, save_to_file = None, progress_cb = None ):
 		# uTorrent can send incorrect overlapping array objects, this will fix them, converting them into list
 		def obj_hook( obj ):
 			out = {}
@@ -477,7 +500,11 @@ class uTorrentConnection( http.client.HTTPConnection ):
 				else:
 					out[ k ] = v
 			return out
-		return json.loads( self._get_data( self._action( action, params, params_str ), data, retry ), object_pairs_hook = obj_hook )
+		res = self._get_data( self._action( action, params, params_str ), data = data, retry = retry, save_to_file = save_to_file, progress_cb = progress_cb )
+		if res:
+			return json.loads( res, object_pairs_hook = obj_hook )
+		else:
+			return ''
 
 	def utorrent( self ):
 		try:
@@ -508,6 +535,9 @@ class uTorrent:
 	def TorrentClass( self ):
 		return self._TorrentClass
 
+	@property
+	def pathmodule( self ):
+		return self._pathmodule
 
 	def __init__( self, connection, version = None ):
 		self._connection = connection
@@ -546,13 +576,22 @@ class uTorrent:
 			if len( out ) == max_elems:
 				break
 		if len( out ) == 0:
-			out.append( '0{}'.format( reducer[ -1][ 1 ] ) )
+			out.append( '0{}'.format( reducer[ -1 ][ 1 ] ) )
 		return ' '.join( out )
+
+	@staticmethod
+	def is_hash( hash ):
+		return re.match( '[0-9A-F]{40}$', hash, re.IGNORECASE )
+
+	@classmethod
+	def check_hash( cls, hash ):
+		if not cls.is_hash( hash ):
+			raise uTorrentError( 'Incorrect hash: {}'.format( hash ) )
 
 	def _create_torrent_upload( self, torrent_data, torrent_filename ):
 		out = '\r\n'.join( (
 			'--{{BOUNDARY}}',
-			'Content-Disposition: form-data; name="torrent_file"; filename="{}"'.format( quote( torrent_filename, '' ) ),
+			'Content-Disposition: form-data; name="torrent_file"; filename="{}"'.format( url_quote( torrent_filename ) ),
 			'Content-Type: application/x-bittorrent',
 			'',
 			torrent_data.decode( 'latin1' ),
@@ -567,12 +606,25 @@ class uTorrent:
 		out = []
 		for t in torrents:
 			if isinstance( t, self._TorrentClass ):
-				out.append( t.hash )
+				hash = t.hash
 			elif isinstance( t, str ):
-				out.append( t )
+				hash = t
 			else:
 				raise uTorrentError( 'Hash designation only supported via Torrent class or string' )
+			self.check_hash( hash )
+			out.append( hash )
 		return out
+
+	def _parse_file_hash( self, file_hash ):
+		if isinstance( file_hash, File ):
+			file_hash = file_hash.hash
+		try:
+			parent_hash, index = file_hash.split( '.', 1 )
+			index = int( index )
+		except ValueError:
+			parent_hash, index = file_hash, 0
+		self.check_hash( parent_hash )
+		return parent_hash, index
 
 	def _handle_download_dir( self, download_dir ):
 		out = None
@@ -587,8 +639,8 @@ class uTorrent:
 		if prev_dir:
 			self.settings_set( { 'dir_active_download' : prev_dir } )
 
-	def do_action( self, action, params = None, params_str = None, data = None, retry = True ):
-		return self._connection.do_action( action, params, params_str, data, retry )
+	def do_action( self, action, params = None, params_str = None, data = None, retry = True, save_to_file = None, progress_cb = None ):
+		return self._connection.do_action( action, params, params_str, data, retry, save_to_file )
 
 	def version( self ):
 		if not self._version:
@@ -608,6 +660,8 @@ class uTorrent:
 
 	def torrent_info( self, torrents ):
 		res = self.do_action( 'getprops', { 'hash' : self._get_hashes( torrents ) } )
+		if not 'props' in res:
+			return {}
 		return { hash : info for hash, info in [ ( i[ 'hash' ], JobInfo( self, jobinfo = i ) ) for i in res[ 'props' ] ] }
 
 	def torrent_add_url( self, url, download_dir = None ):
@@ -679,12 +733,10 @@ class uTorrent:
 	def file_set_priority( self, files ):
 		args = []
 		for hash, prio in files.items():
-			if isinstance( hash, File ):
-				hash = hash.hash
+			parent_hash, index = self._parse_file_hash( hash )
 			if not isinstance( prio, Priority ):
 				prio = Priority( prio )
-			parent_hash, index = hash.split( '.', 1 )
-			args.append( 'hash={}&p={}&f={}'.format( quote( parent_hash, '' ), quote( str( prio.value ), '' ), quote( index, '' ) ) )
+			args.append( 'hash={}&p={}&f={}'.format( url_quote( parent_hash ), url_quote( str( prio.value ) ), url_quote( str( index ) ) ) )
 			self.do_action( 'setprio', params_str = '&'.join( args ) )
 
 	def settings_get( self ):
@@ -699,8 +751,23 @@ class uTorrent:
 		for k, v in settings.items():
 			if isinstance( v, bool ):
 				v = int( v )
-			args.append( 's={}&v={}'.format( quote( k, '' ), quote( str( v ), '' ) ) )
+			args.append( 's={}&v={}'.format( url_quote( k ), url_quote( str( v ) ) ) )
 		self.do_action( 'setsetting', params_str = '&'.join( args ) )
+
+	def torrent_get_magnet( self, torrents, self_tracker = False ):
+		out = {}
+		tors = self.torrent_list()
+		for t in torrents:
+			t = t.upper()
+			utorrent.check_hash( t )
+			if t in tors:
+				if self_tracker:
+					trackers = [ self._connection.request_obj.get_full_url() + 'announce' ]
+				else:
+					trackers = self.torrent_info( t )[ t ].trackers
+				trackers = '&'.join( [ '' ] + [ 'tr=' + url_quote( t ) for t in trackers ] )
+				out[ t ] = 'magnet:?xt=urn:btih:{}&dn={}{}'.format( url_quote( t.lower() ), url_quote( tors[ t ].name ), trackers )
+		return out
 
 
 class uTorrentServer( uTorrent ):
@@ -741,12 +808,9 @@ class uTorrentServer( uTorrent ):
 	def torrent_remove_with_data_torrent( self, torrents ):
 		return self.torrent_remove( torrents, True, True )
 
-	def get_file( self, file ):
-		if isinstance( file, File ):
-			file = file.hash
-		parent_hash, index = file.split( '.', 1 )
-#		args.append( 'hash={}&p={}&f={}'.format( quote( parent_hash, ''), quote( str( prio.value ), '' ), quote( index, '' ) ) )
-#		self.do_action( 'setprio', params_str = '&'.join( args ) )
+	def get_file( self, file_hash, buffer, progress_cb = None ):
+		parent_hash, index = self._parse_file_hash( file_hash )
+		self.do_action( 'proxy', { 'id' : parent_hash, 'file' : index }, save_to_file = buffer, progress_cb = progress_cb )
 
 
 if __name__ == '__main__':
@@ -759,13 +823,13 @@ if __name__ == '__main__':
 		global print_orig
 		print_orig( str( obj ).encode( sys.stdout.encoding, 'replace' ).decode( sys.stdout.encoding ) )
 
-	level1 = '   '
-	level2 = '      '
+	level1 = '\t'
+	level2 = '\t\t'
 
 	parser = optparse.OptionParser()
 	parser.add_option( '-H', '--host', dest = 'host', default = utorrentcfg[ 'host' ], help = 'host of uTorrent (hostname:port)' )
-	parser.add_option( '-u', '--user', dest = 'user', default = utorrentcfg[ 'login' ], help = 'user name' )
-	parser.add_option( '-p', '--password', dest = 'password', default = utorrentcfg[ 'password' ], help = 'user password' )
+	parser.add_option( '-U', '--user', dest = 'user', default = utorrentcfg[ 'login' ], help = 'user name' )
+	parser.add_option( '-P', '--password', dest = 'password', default = utorrentcfg[ 'password' ], help = 'user password' )
 	parser.add_option( '--nv', '--no-verbose', action = 'store_false', dest = 'verbose', default = True, help = 'show shortened info in most cases (quicker, saves network traffic)' )
 	parser.add_option( '--server-version', action = 'store_const', dest = 'action', const = 'server_version', help = 'print uTorrent server version' )
 	parser.add_option( '-l', '--list-torrents', action = 'store_const', dest = 'action', const = 'torrent_list', help = 'list all torrents' )
@@ -773,7 +837,7 @@ if __name__ == '__main__':
 	parser.add_option( '-s', '--sort', default = 'name', dest = 'sort_field', help = 'sort torrents, values are: availability, dl_remain, dl_speed, downloaded, eta, hash, label, name, peers_connected, peers_total, progress, queue_order, ratio, seeds_connected, seeds_total, size, status, ul_speed, uploaded + url, rss_url (for server)' )
 	parser.add_option( '--desc', action = 'store_true', dest = 'sort_desc', default = False, help = 'sort torrents in descending order' )
 	parser.add_option( '-a', '--add-file', action = 'store_const', dest = 'action', const = 'add_file', help = 'add torrents specified by local file names' )
-	parser.add_option( '--add-url', action = 'store_const', dest = 'action', const = 'add_url', help = 'add torrents specified by urls' )
+	parser.add_option( '-u', '--add-url', action = 'store_const', dest = 'action', const = 'add_url', help = 'add torrents specified by urls' )
 	parser.add_option( '--dir', dest = 'download_dir', help = 'directory to download added torrent, if path is relative then it is made relative to current download path parent directory (only for --add)' )
 	parser.add_option( '--settings', action = 'store_const', dest = 'action', const = 'settings_get', help = 'show current server settings, optionally you can use specific setting keys (name name ...)' )
 	parser.add_option( '--set', action = 'store_const', dest = 'action', const = 'settings_set', help = 'assign settings value (key1=value1 key2=value2 ...)' )
@@ -783,15 +847,15 @@ if __name__ == '__main__':
 	parser.add_option( '--resume', action = 'store_const', dest = 'action', const = 'torrent_resume', help = 'resume torrents (hash hash ...)' )
 	parser.add_option( '--recheck', action = 'store_const', dest = 'action', const = 'torrent_recheck', help = 'recheck torrents, torrent must be stopped first (hash hash ...)' )
 	parser.add_option( '--remove', action = 'store_const', dest = 'action', const = 'torrent_remove', help = 'remove torrents (hash hash ...)' )
-	parser.add_option( '--all', action = 'store_true', dest = 'all', default = False, help = 'applies action to all torrents (only for start, stop, pause, resume and recheck)' )
-	parser.add_option( '--force', action = 'store_true', dest = 'force', default = False, help = 'forces current command (only for start)' )
-	parser.add_option( '--data', action = 'store_true', dest = 'with_data', default = False, help = 'when removing torrent also remove its data (only for remove)' )
-	parser.add_option( '--torrent', action = 'store_true', dest = 'with_torrent', default = False, help = 'when removing torrent also remove its torrent file (only for remove with uTorrent server)' )
-	parser.add_option( '-i', '--info', action = 'store_const', dest = 'action', const = 'torrent_info', help = 'show settings and trackers for the specified torrents (hash hash ...)' )
-	parser.add_option( '-f', '--list-files', action = 'store_const', dest = 'action', const = 'file_list', help = 'displays file list within torrents (hash hash ...)' )
-	parser.add_option( '-I', '--full-info', action = 'store_const', dest = 'action', const = 'torrent_full_info', help = 'displays full information about torrents (hash hash ...)' )
-	parser.add_option( '--set-file-priority', action = 'store_const', dest = 'action', const = 'set_file_priority', help = 'sets specified file priority (hash.file_index=prio hash.file_index=prio ...) prio=0..3' )
+	parser.add_option( '--all', action = 'store_true', dest = 'all', default = False, help = 'applies action to all torrents (for start, stop, pause, resume and recheck)' )
+	parser.add_option( '-F', '--force', action = 'store_true', dest = 'force', default = False, help = 'forces current command (for start and remove)' )
+	parser.add_option( '--data', action = 'store_true', dest = 'with_data', default = False, help = 'when removing torrent also remove its data (for remove, also enabled by --force)' )
+	parser.add_option( '--torrent', action = 'store_true', dest = 'with_torrent', default = False, help = 'when removing torrent also remove its torrent file (for remove with uTorrent server, also enabled by --force)' )
+	parser.add_option( '-i', '--info', action = 'store_const', dest = 'action', const = 'torrent_info', help = 'show info and file/trackers list for the specified torrents (hash hash ...)' )
+	parser.add_option( '--download', action = 'store_const', dest = 'action', const = 'download_file', help = 'downloads specified file (hash.file_index)' )
+	parser.add_option( '--set-file-prio', action = 'store_const', dest = 'action', const = 'set_file_priority', help = 'sets specified file priority (hash.file_index=prio hash.file_index=prio ...) prio=0..3' )
 	parser.add_option( '--set-label', action = 'store_const', dest = 'action', const = 'set_label', help = 'assign label to torrents (label hash hash ...)' )
+	parser.add_option( '--magnet', action = 'store_const', dest = 'action', const = 'get_magnet', help = 'generate magnet link for the specified torrents (hash hash ...)' )
 	opts, args = parser.parse_args()
 	
 	try:
@@ -881,41 +945,11 @@ if __name__ == '__main__':
 		elif opts.action == 'torrent_remove':
 			print( 'Removing ' + ', '.join( args ) + '...' )
 			if utorrent.api_version == 1:
-				utorrent.torrent_remove( args, opts.with_data )
+				utorrent.torrent_remove( args, opts.with_data or opts.force )
 			elif utorrent.api_version == 2:
-				utorrent.torrent_remove( args, opts.with_data, opts.with_torrent )
+				utorrent.torrent_remove( args, opts.with_data or opts.force, opts.with_torrent or opts.force )
 
 		elif opts.action == 'torrent_info':
-			if opts.verbose:
-				tors = utorrent.torrent_list()
-			for hsh, info in utorrent.torrent_info( args ).items():
-				if opts.verbose:
-					print( '{} ({})'.format( tors[ hsh ].name, hsh ) )
-				else:
-					print( 'Torrent: ' + hsh )
-				if opts.verbose:
-					print( level1 + info.verbose_str() )
-				else:
-					print( level1 + str( info ) )
-				print( level1 + 'Trackers:' )
-				for tr in info.trackers:
-					print( level2 + tr )
-
-		elif opts.action == 'file_list':
-			if opts.verbose:
-				tors = utorrent.torrent_list()
-			for hsh, fs in utorrent.file_list( args ).items():
-				if opts.verbose:
-					print( '{} ({})'.format( tors[ hsh ].name, hsh ) )
-				else:
-					print( 'Torrent: ' + hsh )
-				for f in fs:
-					if opts.verbose:
-						print( level1 + f.verbose_str() )
-					else:
-						print( level1 + str( f ) )
-
-		elif opts.action == 'torrent_full_info':
 			tors = utorrent.torrent_list()
 			files = utorrent.file_list( args )
 			infos = utorrent.torrent_info( args )
@@ -938,6 +972,19 @@ if __name__ == '__main__':
 				for tr in infos[ hsh ].trackers:
 					print( level2 + tr )
 
+		elif opts.action == 'download_file':
+			try:
+				parent_hash, index = args[ 0 ].split( '.', 1 )
+				index = int( index )
+			except ValueError:
+				parent_hash, index = args[ 0 ], 0
+			filename = utorrent.pathmodule.basename( utorrent.file_list( parent_hash )[ parent_hash ][ index ].name )
+			print( 'Downloading {}...'.format( filename ) )
+			file = open( filename, 'wb' )
+			def progress():
+				pass
+			utorrent.get_file( args[ 0 ], file, progress )
+
 		elif opts.action == 'set_file_priority':
 			utorrent.file_set_priority( { k : v for k, v in [ i.split( '=' ) for i in args ] } )
 
@@ -948,6 +995,16 @@ if __name__ == '__main__':
 			else:
 				print( 'Setting label ' + args[0] + ' for ' + ', '.join( args[1:] ) + '...' )
 			utorrent.torrent_set_label( args )
+
+		elif opts.action == 'get_magnet':
+			if opts.verbose:
+				tors = utorrent.torrent_list()
+			for hsh, lnk in utorrent.torrent_get_magnet( args ).items():
+				if opts.verbose:
+					print( tors[ hsh ] )
+				else:
+					print( hsh )
+				print( level1 + lnk )
 
 		else:
 			parser.print_help()

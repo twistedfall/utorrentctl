@@ -973,6 +973,8 @@ if __name__ == '__main__':
 					print( level2 + tr )
 
 		elif opts.action == 'download_file':
+			if utorrent.api_version != 2:
+				raise uTorrentError( 'Downloading files only supported for uTorrent Server' )
 			try:
 				parent_hash, index = args[ 0 ].split( '.', 1 )
 				index = int( index )

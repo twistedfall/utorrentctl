@@ -419,8 +419,13 @@ class uTorrentConnection( http.client.HTTPConnection ):
 				self.request( self._request.get_method(), self._request.get_selector() + loc, self._request.get_data(), headers )
 				resp = self.getresponse()
 				if save_to_file:
+					read = 0
+					resp_len = resp.length
 					while True:
 						buf = resp.read( 10240 )
+						read += len( buf )
+						if progress_cb:
+							progress_cb( read, resp_len )
 						if len( buf ) == 0:
 							break
 						save_to_file.write( buf )
@@ -640,7 +645,7 @@ class uTorrent:
 			self.settings_set( { 'dir_active_download' : prev_dir } )
 
 	def do_action( self, action, params = None, params_str = None, data = None, retry = True, save_to_file = None, progress_cb = None ):
-		return self._connection.do_action( action, params, params_str, data, retry, save_to_file )
+		return self._connection.do_action( action = action, params = params, params_str = params_str, data = data, retry = retry, save_to_file = save_to_file, progress_cb = progress_cb )
 
 	def version( self ):
 		if not self._version:

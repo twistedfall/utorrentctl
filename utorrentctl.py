@@ -830,7 +830,7 @@ if __name__ == '__main__':
 		print_orig( *map( lambda x: str( x ).encode( sys.stdout.encoding, 'replace' ).decode( sys.stdout.encoding ), objs ), sep = sep, end = end, file = file )
 
 	level1 = '\t'
-	level2 = '\t\t'
+	level2 = '\t' * 2
 
 	parser = optparse.OptionParser()
 	parser.add_option( '-H', '--host', dest = 'host', default = utorrentcfg[ 'host' ], help = 'host of uTorrent (hostname:port)' )

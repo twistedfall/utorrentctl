@@ -825,9 +825,9 @@ if __name__ == '__main__':
 
 	print_orig = print
 
-	def print( obj ):
+	def print( *objs, sep = ' ', end = '\n', file = sys.stdout ):
 		global print_orig
-		print_orig( str( obj ).encode( sys.stdout.encoding, 'replace' ).decode( sys.stdout.encoding ) )
+		print_orig( *map( lambda x: str( x ).encode( sys.stdout.encoding, 'replace' ).decode( sys.stdout.encoding ), objs ), sep = sep, end = end, file = file )
 
 	level1 = '\t'
 	level2 = '\t\t'

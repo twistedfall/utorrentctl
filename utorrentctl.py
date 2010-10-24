@@ -989,8 +989,28 @@ if __name__ == '__main__':
 			filename = utorrent.pathmodule.basename( utorrent.file_list( parent_hash )[ parent_hash ][ index ].name )
 			print( 'Downloading {}...'.format( filename ) )
 			file = open( filename, 'wb' )
-			def progress():
-				pass
+			bar_width = 50
+			size_calc = False
+			increm = 0
+			start_time = datetime.datetime.now()
+			def progress( loaded, total ):
+				global bar_width, size_calc, increm, start_time
+				if not size_calc:
+					size_calc = True
+					increm = round( total / bar_width )
+				progr = loaded // increm
+				delta = datetime.datetime.now() - start_time
+				delta = delta.seconds + delta.microseconds / 1000000
+				print( '[{}{}] {} {}/s eta: {}{}'.format(
+					'*' * progr, '_' * ( bar_width - progr ),
+					uTorrent.human_size( total ),
+					uTorrent.human_size( loaded / delta ),
+					uTorrent.human_time_delta( ( total - loaded ) / ( loaded / delta ) ),
+					' ' * 25
+					), sep = '', end = ''
+				)
+				print( '\b' * ( bar_width + 70 ), end = '' )
+				sys.stdout.flush()
 			utorrent.get_file( args[ 0 ], file, progress )
 
 		elif opts.action == 'set_file_priority':

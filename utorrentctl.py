@@ -593,6 +593,18 @@ class uTorrent:
 		if not cls.is_hash( hash ):
 			raise uTorrentError( 'Incorrect hash: {}'.format( hash ) )
 
+	@classmethod
+	def parse_file_hash( cls, file_hash ):
+		if isinstance( file_hash, File ):
+			file_hash = file_hash.hash
+		try:
+			parent_hash, index = file_hash.split( '.', 1 )
+			index = int( index )
+		except ValueError:
+			parent_hash, index = file_hash, 0
+		cls.check_hash( parent_hash )
+		return parent_hash, index
+
 	def _create_torrent_upload( self, torrent_data, torrent_filename ):
 		out = '\r\n'.join( (
 			'--{{BOUNDARY}}',
@@ -619,17 +631,6 @@ class uTorrent:
 			self.check_hash( hash )
 			out.append( hash )
 		return out
-
-	def _parse_file_hash( self, file_hash ):
-		if isinstance( file_hash, File ):
-			file_hash = file_hash.hash
-		try:
-			parent_hash, index = file_hash.split( '.', 1 )
-			index = int( index )
-		except ValueError:
-			parent_hash, index = file_hash, 0
-		self.check_hash( parent_hash )
-		return parent_hash, index
 
 	def _handle_download_dir( self, download_dir ):
 		out = None
@@ -738,7 +739,7 @@ class uTorrent:
 	def file_set_priority( self, files ):
 		args = []
 		for hash, prio in files.items():
-			parent_hash, index = self._parse_file_hash( hash )
+			parent_hash, index = self.parse_file_hash( hash )
 			if not isinstance( prio, Priority ):
 				prio = Priority( prio )
 			args.append( 'hash={}&p={}&f={}'.format( url_quote( parent_hash ), url_quote( str( prio.value ) ), url_quote( str( index ) ) ) )
@@ -814,7 +815,7 @@ class uTorrentServer( uTorrent ):
 		return self.torrent_remove( torrents, True, True )
 
 	def get_file( self, file_hash, buffer, progress_cb = None ):
-		parent_hash, index = self._parse_file_hash( file_hash )
+		parent_hash, index = self.parse_file_hash( file_hash )
 		self.do_action( 'proxy', { 'id' : parent_hash, 'file' : index }, save_to_file = buffer, progress_cb = progress_cb )
 
 

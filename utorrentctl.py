@@ -1047,6 +1047,7 @@ if __name__ == '__main__':
 			if utorrent.api_version != 2:
 				raise uTorrentError( 'Downloading files only supported for uTorrent Server' )
 			parent_hash, index = uTorrent.parse_hash_prop( args[ 0 ] )
+			index = int( index )
 			filename = utorrent.pathmodule.basename( utorrent.file_list( parent_hash )[ parent_hash ][ index ].name )
 			print( 'Downloading {}...'.format( filename ) )
 			file = open( filename, 'wb' )

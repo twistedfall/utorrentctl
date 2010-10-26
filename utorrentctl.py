@@ -185,9 +185,9 @@ class Torrent:
 		return '{} {}'.format( self.hash, self.name )
 
 	def verbose_str( self ):
-		return '{} {: <15} {: >5.1f}% {: >9} D:{: >12} U:{: >12} {: <8.3f} {: <9} eta: {: <7} {}{}'.format(
+		return '{} {: <15} {: >5.1f}% {: >9} D:{: >14} U:{: >14} {: <8.3f} {: <9} eta: {: <7} {}{}'.format(
 			self.hash, self.status, self.progress, self.size_h,
-			self.dl_speed_h + '/s' if self.dl_speed > 0 else '', self.ul_speed_h + '/s' if self.ul_speed > 0 else '',
+			self.dl_speed_h if self.dl_speed > 0 else '', self.ul_speed_h if self.ul_speed > 0 else '',
 			self.ratio, '{}({})/{}'.format( self.seeds_connected, self.seeds_total, self.peers_connected ),
 			self.eta_h, self.name, ' ({})'.format( self.label ) if self.label else ''
 		)
@@ -207,8 +207,8 @@ class Torrent:
 		self.size_h = uTorrent.human_size( self.size )
 		self.uploaded_h = uTorrent.human_size( self.uploaded )
 		self.downloaded_h = uTorrent.human_size( self.downloaded )
-		self.ul_speed_h = uTorrent.human_size( self.ul_speed )
-		self.dl_speed_h = uTorrent.human_size( self.dl_speed )
+		self.ul_speed_h = uTorrent.human_size( self.ul_speed ) + '/s'
+		self.dl_speed_h = uTorrent.human_size( self.dl_speed ) + '/s'
 		self.eta_h = uTorrent.human_time_delta( self.eta )
 
 	@classmethod

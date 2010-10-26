@@ -850,7 +850,7 @@ class uTorrentServer( uTorrent ):
 	def torrent_remove_with_data_torrent( self, torrents ):
 		return self.torrent_remove( torrents, True, True )
 
-	def get_file( self, file_hash, buffer, progress_cb = None ):
+	def file_get( self, file_hash, buffer, progress_cb = None ):
 		parent_hash, index = self.parse_hash_prop( file_hash )
 		self.do_action( 'proxy', { 'id' : parent_hash, 'file' : index }, save_to_file = buffer, progress_cb = progress_cb )
 
@@ -1072,7 +1072,7 @@ if __name__ == '__main__':
 				)
 				print( '\b' * ( bar_width + 70 ), end = '' )
 				sys.stdout.flush()
-			utorrent.get_file( args[ 0 ], save_to_file = file, progress_cb = progress )
+			utorrent.file_get( args[ 0 ], buffer = file, progress_cb = progress )
 
 		elif opts.action == 'set_file_priority':
 			utorrent.file_set_priority( { k : v for k, v in [ i.split( '=' ) for i in args ] } )

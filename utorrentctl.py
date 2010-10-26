@@ -763,6 +763,21 @@ class uTorrent:
 	def torrent_remove_with_data( self, torrents ):
 		return self.torrent_remove( torrents, True )
 
+	def torrent_get_magnet( self, torrents, self_tracker = False ):
+		out = {}
+		tors = self.torrent_list()
+		for t in torrents:
+			t = t.upper()
+			utorrent.check_hash( t )
+			if t in tors:
+				if self_tracker:
+					trackers = [ self._connection.request_obj.get_full_url() + 'announce' ]
+				else:
+					trackers = self.torrent_info( t )[ t ].trackers
+				trackers = '&'.join( [ '' ] + [ 'tr=' + url_quote( t ) for t in trackers ] )
+				out[ t ] = 'magnet:?xt=urn:btih:{}&dn={}{}'.format( url_quote( t.lower() ), url_quote( tors[ t ].name ), trackers )
+		return out
+
 	def file_list( self, torrents ):
 		res = self.do_action( 'getfiles', { 'hash' : self._get_hashes( torrents ) } )
 		out = {}
@@ -803,21 +818,6 @@ class uTorrent:
 			args.append( 's={}&v={}'.format( url_quote( k ), url_quote( str( v ) ) ) )
 		self.do_action( 'setsetting', params_str = '&'.join( args ) )
 
-	def torrent_get_magnet( self, torrents, self_tracker = False ):
-		out = {}
-		tors = self.torrent_list()
-		for t in torrents:
-			t = t.upper()
-			utorrent.check_hash( t )
-			if t in tors:
-				if self_tracker:
-					trackers = [ self._connection.request_obj.get_full_url() + 'announce' ]
-				else:
-					trackers = self.torrent_info( t )[ t ].trackers
-				trackers = '&'.join( [ '' ] + [ 'tr=' + url_quote( t ) for t in trackers ] )
-				out[ t ] = 'magnet:?xt=urn:btih:{}&dn={}{}'.format( url_quote( t.lower() ), url_quote( tors[ t ].name ), trackers )
-		return out
-
 
 class uTorrentServer( uTorrent ):
 
@@ -826,13 +826,6 @@ class uTorrentServer( uTorrent ):
 	_pathmodule = posixpath
 
 	api_version = 2 # http://download.utorrent.com/linux/utorrent-server-3.0-21886.tar.gz:bittorrent-server-v3_0/docs/uTorrent_Server.html
-
-	def settings_get( self, extended_attributes = False ):
-		res = self.do_action( 'getsettings' )
-		out = {}
-		for name, type, value, attrs in res[ 'settings' ]:
-			out[ name ] = self._setting_val( type, value )
-		return out
 
 	def version( self ):
 		if not self._version:
@@ -860,6 +853,13 @@ class uTorrentServer( uTorrent ):
 	def get_file( self, file_hash, buffer, progress_cb = None ):
 		parent_hash, index = self.parse_hash_prop( file_hash )
 		self.do_action( 'proxy', { 'id' : parent_hash, 'file' : index }, save_to_file = buffer, progress_cb = progress_cb )
+
+	def settings_get( self, extended_attributes = False ):
+		res = self.do_action( 'getsettings' )
+		out = {}
+		for name, type, value, attrs in res[ 'settings' ]:
+			out[ name ] = self._setting_val( type, value )
+		return out
 
 
 if __name__ == '__main__':

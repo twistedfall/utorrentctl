@@ -20,7 +20,8 @@
 """
 
 import urllib.request, http.client, http.cookiejar, urllib.parse, socket
-import re, json, base64, posixpath, ntpath, email.generator, os.path, datetime, errno
+import base64, posixpath, ntpath, email.generator, os.path, datetime, errno
+import re, json, itertools 
 def url_quote( string ):
 	return urllib.parse.quote( string, '' )
 try:
@@ -1038,7 +1039,7 @@ if __name__ == '__main__':
 							value = '{} ({})'.format( value, getattr( tors[ hsh ], name + '_h' ) )
 						print( level2 + '{} = {}'.format( name, value ) )
 				print( level1 + 'Changeable:' )
-				for name, value in sorted( tuple( info.dump().items() ) + ( ( 'label', tors[ hsh ].label ), ) ):
+				for name, value in sorted( itertools.chain( info.dump().items(), ( ( 'label', tors[ hsh ].label ), ) ) ):
 					if name != 'trackers':
 						print( level2 + '{} = {}'.format( name, value ) )
 

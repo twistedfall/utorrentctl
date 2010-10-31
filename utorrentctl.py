@@ -21,6 +21,7 @@
 
 import urllib.request, http.client, http.cookiejar, urllib.parse, socket
 import base64, posixpath, ntpath, email.generator, os.path, datetime, errno
+from hashlib import sha1
 import re, json, itertools 
 def url_quote( string ):
 	return urllib.parse.quote( string, '' )
@@ -28,6 +29,76 @@ try:
 	from config import utorrentcfg
 except ImportError:
 	utorrentcfg = { 'host' : None, 'login' : None, 'password' : None  }
+
+
+def bdecode( data ):
+	if not hasattr( data, '__next__' ):
+		data = iter( data )
+	out = None
+	t = chr( next( data ) )
+	if t == 'e':
+		return None
+	elif t == 'i':
+		out = ''
+		c = chr( next( data ) )
+		while c != 'e':
+			out += c
+			c = chr( next( data ) )
+		out = int( out )
+	elif t == 'l':
+		out = []
+		while True:
+			e = bdecode( data )
+			if e == None:
+				break
+			out.append( e )
+	elif t == 'd': # dictionary
+		out = {}
+		while True:
+			k = bdecode( data )
+			if k == None:
+				break
+			out[ k ] = bdecode( data )
+	elif t.isdigit(): # string
+		out = ''
+		l = t
+		c = chr( next( data ) )
+		while c != ':':
+			l += c
+			c = chr( next( data ) )
+		bout = bytearray()
+		for i in range( int( l ) ):
+			bout.append( next( data ) )
+		try:
+			out = bout.decode( 'utf8' )
+		except UnicodeDecodeError:
+			out = bout
+	return out
+
+def bencode( obj ):
+	out = bytearray()
+	t = type( obj )
+	if t == int:
+		out.extend( 'i{}e'.format( obj ).encode( 'utf8' ) )
+	elif t in( list, tuple ):
+		out.extend( b'l' )
+		for e in map( bencode, obj ):
+			out.extend( e )
+		out.extend( b'e' )
+	elif t == dict:
+		out.extend( b'd' )
+		for k in sorted( obj.keys() ):
+			out.extend( bencode( k ) )
+			out.extend( bencode( obj[ k ] ) )
+		out.extend( b'e' )
+	elif t in ( bytes, bytearray ):
+		out.extend( str( len( obj ) ).encode( 'utf8' ) )
+		out.extend( b':')
+		out.extend( obj )
+	else:
+		obj = str( obj )
+		out.extend( '{}:{}'.format( len( obj ), obj ).encode( 'utf8' ) )
+	return bytes( out )
 
 
 class uTorrentError( Exception ):
@@ -605,6 +676,14 @@ class uTorrent:
 	def is_hash( hash ):
 		return re.match( '[0-9A-F]{40}$', hash, re.IGNORECASE )
 
+	@staticmethod
+	def get_info_hash( torrent_data ):
+		a = bencode( bdecode( torrent_data )[ 'info' ] )
+		f = open( '/tmp/aaa', 'wb' )
+		f.write(a)
+		f.close()
+		return sha1( bencode( bdecode( torrent_data )[ 'info' ] ) ).hexdigest().upper()
+
 	@classmethod
 	def check_hash( cls, hash ):
 		if not cls.is_hash( hash ):
@@ -708,12 +787,13 @@ class uTorrent:
 		self._handle_prev_dir( prev_dir )
 		if 'error' in res:
 			raise uTorrentError( res[ 'error' ] )
+		return self.get_info_hash( torrent_data )
 
 	def torrent_add_file( self, filename, download_dir = None ):
 		f = open( filename, 'rb' )
 		torrent_data = f.read()
 		f.close()
-		self.torrent_add_data( torrent_data, download_dir, os.path.basename( filename ) )
+		return self.torrent_add_data( torrent_data, download_dir, os.path.basename( filename ) )
 
 	'''
 	[
@@ -939,7 +1019,8 @@ if __name__ == '__main__':
 		elif opts.action == 'add_file':
 			for i in args:
 				print( 'Submitting {}...'.format( i ) )
-				utorrent.torrent_add_file( i, opts.download_dir )
+				hash = utorrent.torrent_add_file( i, opts.download_dir )
+				print( level1 + 'Info hash = {}'.format( hash ) )
 
 		elif opts.action == 'add_url':
 			for i in args:

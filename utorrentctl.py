@@ -678,10 +678,6 @@ class uTorrent:
 
 	@staticmethod
 	def get_info_hash( torrent_data ):
-		a = bencode( bdecode( torrent_data )[ 'info' ] )
-		f = open( '/tmp/aaa', 'wb' )
-		f.write(a)
-		f.close()
 		return sha1( bencode( bdecode( torrent_data )[ 'info' ] ) ).hexdigest().upper()
 
 	@classmethod

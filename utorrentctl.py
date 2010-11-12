@@ -731,7 +731,7 @@ class uTorrent:
 		if download_dir:
 			out = self.settings_get()[ 'dir_active_download' ]
 			if not self._pathmodule.isabs( download_dir ):
-				download_dir = self._pathmodule.dirname( out ) + self._pathmodule.sep + download_dir
+				download_dir = out + self._pathmodule.sep + download_dir
 			self.settings_set( { 'dir_active_download' : download_dir } )
 		return out
 
@@ -966,7 +966,7 @@ if __name__ == '__main__':
 	parser.add_option( '--desc', action = 'store_true', dest = 'sort_desc', default = False, help = 'sort torrents in descending order' )
 	parser.add_option( '-a', '--add-file', action = 'store_const', dest = 'action', const = 'add_file', help = 'add torrents specified by local file names' )
 	parser.add_option( '-u', '--add-url', action = 'store_const', dest = 'action', const = 'add_url', help = 'add torrents specified by urls' )
-	parser.add_option( '--dir', dest = 'download_dir', help = 'directory to download added torrent, if path is relative then it is made relative to current download path parent directory (only for --add)' )
+	parser.add_option( '--dir', dest = 'download_dir', help = 'directory to download added torrent, absolute or relative to current download dir (only for --add)' )
 	parser.add_option( '--settings', action = 'store_const', dest = 'action', const = 'settings_get', help = 'show current server settings, optionally you can use specific setting keys (name name ...)' )
 	parser.add_option( '--set', action = 'store_const', dest = 'action', const = 'settings_set', help = 'assign settings value (key1=value1 key2=value2 ...)' )
 	parser.add_option( '--start', action = 'store_const', dest = 'action', const = 'torrent_start', help = 'start torrents (hash hash ...)' )

@@ -31,73 +31,75 @@ except ImportError:
 	utorrentcfg = { 'host' : None, 'login' : None, 'password' : None  }
 
 
-def bdecode( data ):
-	if not hasattr( data, '__next__' ):
+def bdecode( data, str_encoding = "utf8" ):
+	if not hasattr( data, "__next__" ):
 		data = iter( data )
 	out = None
 	t = chr( next( data ) )
-	if t == 'e':
+	if t == "e":
 		return None
-	elif t == 'i':
-		out = ''
+	elif t == "i":
+		out = ""
 		c = chr( next( data ) )
-		while c != 'e':
+		while c != "e":
 			out += c
 			c = chr( next( data ) )
 		out = int( out )
-	elif t == 'l':
+	elif t == "l":
 		out = []
 		while True:
 			e = bdecode( data )
 			if e == None:
 				break
 			out.append( e )
-	elif t == 'd': # dictionary
+	elif t == "d": # dictionary
 		out = {}
 		while True:
 			k = bdecode( data )
 			if k == None:
 				break
-			out[ k ] = bdecode( data )
+			out[k] = bdecode( data )
 	elif t.isdigit(): # string
-		out = ''
+		out = ""
 		l = t
 		c = chr( next( data ) )
-		while c != ':':
+		while c != ":":
 			l += c
 			c = chr( next( data ) )
 		bout = bytearray()
 		for i in range( int( l ) ):
 			bout.append( next( data ) )
 		try:
-			out = bout.decode( 'utf8' )
+			out = bout.decode( str_encoding )
 		except UnicodeDecodeError:
 			out = bout
 	return out
 
-def bencode( obj ):
+def bencode( obj, str_encoding = "utf8" ):
 	out = bytearray()
 	t = type( obj )
 	if t == int:
-		out.extend( 'i{}e'.format( obj ).encode( 'utf8' ) )
+		out.extend( "i{}e".format( obj ).encode( str_encoding ) )
 	elif t in( list, tuple ):
-		out.extend( b'l' )
+		out.extend( b"l" )
 		for e in map( bencode, obj ):
 			out.extend( e )
-		out.extend( b'e' )
+		out.extend( b"e" )
 	elif t == dict:
-		out.extend( b'd' )
+		out.extend( b"d" )
 		for k in sorted( obj.keys() ):
 			out.extend( bencode( k ) )
-			out.extend( bencode( obj[ k ] ) )
-		out.extend( b'e' )
+			out.extend( bencode( obj[k] ) )
+		out.extend( b"e" )
 	elif t in ( bytes, bytearray ):
-		out.extend( str( len( obj ) ).encode( 'utf8' ) )
-		out.extend( b':')
+		out.extend( str( len( obj ) ).encode( str_encoding ) )
+		out.extend( b":" )
 		out.extend( obj )
 	else:
-		obj = str( obj )
-		out.extend( '{}:{}'.format( len( obj ), obj ).encode( 'utf8' ) )
+		obj = str( obj ).encode( str_encoding )
+		out.extend( str( len( obj ) ).encode( str_encoding ) )
+		out.extend( b":" )
+		out.extend( obj )
 	return bytes( out )
 
 
@@ -678,7 +680,7 @@ class uTorrent:
 
 	@staticmethod
 	def get_info_hash( torrent_data ):
-		return sha1( bencode( bdecode( torrent_data )[ 'info' ] ) ).hexdigest().upper()
+		return sha1( bencode( bdecode( torrent_data )["info"] ) ).hexdigest().upper()
 
 	@classmethod
 	def check_hash( cls, hash ):

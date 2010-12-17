@@ -1066,12 +1066,14 @@ if __name__ == "__main__":
 				print( utorrent.version() )
 
 		elif opts.action == "torrent_list":
-			total_ul, total_dl = 0, 0
+			total_ul, total_dl, count, total_size = 0, 0, 0, 0
 			if not opts.sort_field in utorrent.TorrentClass.get_sortable_attrs():
 				opts.sort_field = "name"
 			for h, t in sorted( utorrent.torrent_list().items(), key = lambda x: getattr( x[1], opts.sort_field ), reverse = opts.sort_desc ):
 				if not opts.active or opts.active and ( t.ul_speed > 0 or t.dl_speed > 0 ): # handle --active
-					if opts.label == None or opts.label == t.label: # handle --label 
+					if opts.label == None or opts.label == t.label: # handle --label
+						count += 1
+						total_size += t.size
 						if opts.verbose:
 							print( t.verbose_str() )
 							total_ul += t.ul_speed
@@ -1079,7 +1081,10 @@ if __name__ == "__main__":
 						else:
 							print( t )
 			if opts.verbose:
-				print( "Total speed: D:{}/s U:{}/s".format( uTorrent.human_size( total_dl ), uTorrent.human_size( total_ul ) ) )
+				print( "Total speed: D:{}/s U:{}/s  Count: {}  Total size: {}".format(
+					uTorrent.human_size( total_dl ), uTorrent.human_size( total_ul ),
+					count, uTorrent.human_size( total_size )
+				) )
 
 		elif opts.action == "add_file":
 			for i in args:

@@ -36,16 +36,16 @@ def bdecode( data, str_encoding = "utf8" ):
 		data = iter( data )
 	out = None
 	t = chr( next( data ) )
-	if t == "e":
+	if t == "e": # end of list/dict
 		return None
-	elif t == "i":
+	elif t == "i": # integer
 		out = ""
 		c = chr( next( data ) )
 		while c != "e":
 			out += c
 			c = chr( next( data ) )
 		out = int( out )
-	elif t == "l":
+	elif t == "l": # list
 		out = []
 		while True:
 			e = bdecode( data )

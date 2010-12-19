@@ -1081,7 +1081,7 @@ if __name__ == "__main__":
 						else:
 							print( t )
 			if opts.verbose:
-				print( "Total speed: D:{}/s U:{}/s  Count: {}  Total size: {}".format(
+				print( "Total speed: D:{}/s U:{}/s  count: {}  size: {}".format(
 					uTorrent.human_size( total_dl ), uTorrent.human_size( total_ul ),
 					count, uTorrent.human_size( total_size )
 				) )

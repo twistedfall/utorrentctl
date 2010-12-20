@@ -1073,7 +1073,7 @@ if __name__ == "__main__":
 				if not opts.active or opts.active and ( t.ul_speed > 0 or t.dl_speed > 0 ): # handle --active
 					if opts.label == None or opts.label == t.label: # handle --label
 						count += 1
-						total_size += t.size
+						total_size += t.progress / 100 * t.size
 						if opts.verbose:
 							print( t.verbose_str() )
 							total_ul += t.ul_speed

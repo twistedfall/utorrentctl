@@ -22,7 +22,8 @@
 import urllib.request, http.client, http.cookiejar, urllib.parse, socket
 import base64, posixpath, ntpath, email.generator, os.path, datetime, errno
 from hashlib import sha1
-import re, json, itertools 
+import re, json
+
 def url_quote( string ):
 	return urllib.parse.quote( string, "" )
 try:
@@ -80,7 +81,7 @@ def bencode( obj, str_encoding = "utf8" ):
 	t = type( obj )
 	if t == int:
 		out.extend( "i{}e".format( obj ).encode( str_encoding ) )
-	elif t in( list, tuple ):
+	elif is_list_type( obj ):
 		out.extend( b"l" )
 		for e in map( bencode, obj ):
 			out.extend( e )
@@ -101,6 +102,14 @@ def bencode( obj, str_encoding = "utf8" ):
 		out.extend( b":" )
 		out.extend( obj )
 	return bytes( out )
+
+
+def _get_external_attrs( cls ):
+	return [ i for i in dir( cls ) if not re.search( "^_|_h$", i ) and not hasattr( getattr( cls, i ), "__call__" ) ]
+
+
+def is_list_type( obj ):
+	return isinstance( obj, ( tuple, list, set ) )
 
 
 class uTorrentError( Exception ):
@@ -270,9 +279,6 @@ class Torrent:
 			self.eta_h, self.name, " ({})".format( self.label ) if self.label else ""
 		)
 
-	def dump( self ):
-		return { k : str( getattr( self, k ) ) for k in self.get_sortable_attrs() }
-
 	def fill( self, torrent ):
 		self.hash, status, self.name, self.size, progress, self.downloaded, \
 			self.uploaded, ratio, self.ul_speed, self.dl_speed, self.eta, self.label, \
@@ -290,8 +296,12 @@ class Torrent:
 		self.eta_h = uTorrent.human_time_delta( self.eta )
 
 	@classmethod
-	def get_sortable_attrs( cls ):
-		return [ i for i in dir( cls ) if not re.search( "^_|_h$", i ) and not hasattr( getattr( cls, i ), "__call__" ) ]
+	def get_readonly_attrs( cls ):
+		return tuple( set( _get_external_attrs( cls ) ) - set( ( "label", ) ) )
+
+	@classmethod
+	def get_public_attrs( cls ):
+		return tuple( set( _get_external_attrs( cls ) ) - set( cls.get_readonly_attrs() ) )
 
 	def info( self ):
 		return self._utorrent.torrent_info( self )
@@ -457,14 +467,11 @@ class JobInfo_API1_9:
 		return "Limits D:{} U:{}".format( self.dlrate, self.ulrate )
 
 	def verbose_str( self ):
-		return "Limits D:{} U:{};  Superseed:{};  DHT:{};  PEX:{};  Queuing override:{}  Seed ratio:{};  Seed time:{}".format(
-			self.dlrate, self.ulrate, self._tribool_status_str( self.superseed ), self._tribool_status_str( self.dht ),
+		return str( self ) + "  Superseed:{};  DHT:{}  PEX:{}  Queuing override:{}  Seed ratio:{}  Seed time:{}".format(
+			self._tribool_status_str( self.superseed ), self._tribool_status_str( self.dht ),
 			self._tribool_status_str( self.pex ), self._tribool_status_str( self.seed_override ), self.seed_ratio,
 			uTorrent.human_time_delta( self.seed_time )
 		)
-
-	def dump( self ):
-		return { k : str( getattr( self, k ) ) for k in self.get_sortable_attrs() }
 
 	def fill( self, jobinfo ):
 		self.hash = jobinfo["hash"]
@@ -479,8 +486,8 @@ class JobInfo_API1_9:
 		self.seed_time = jobinfo["seed_time"]
 
 	@classmethod
-	def get_sortable_attrs( cls ):
-		return [ i for i in dir( cls ) if not re.search( "^_|_h$", i ) and not hasattr( getattr( cls, i ), "__call__" ) ]
+	def get_public_attrs( cls ):
+		return _get_external_attrs( cls )
 
 	def _tribool_status_str( self, status ):
 		return "not allowed" if status == -1 else ( "disabled" if status == 0 else "enabled" )
@@ -496,6 +503,139 @@ class JobInfo( JobInfo_API1_9 ):
 	def fill( self, jobinfo ):
 		JobInfo_API1_9.fill( self, jobinfo )
 		self.ulslots = jobinfo["ulslots"]
+
+
+class RssFeedEntry:
+	
+	name = ""
+	name_full = ""
+	url = ""
+	quality = 0
+	codec = 0
+	timestamp = 0
+	season = 0
+	episode = 0
+	episode_to = 0
+	feed_id = 0
+	repack = False
+	in_history = False
+
+	def __init__( self, entry ):
+		self.fill( entry )
+
+	def __str__( self ):
+		return "{}".format( self.name )
+		
+	def verbose_str( self ):
+		return "{:1} {}".format( '*' if self.in_history else ' ', self.name_full )
+		
+	def fill( self, entry ):
+		self.name, self.name_full, self.url, self.quality, self.codec, self.timestamp, self.season, self.episode, \
+			self.episode_to, self.feed_id, self.repack, self.in_history = entry
+		try:
+			self.timestamp = datetime.datetime.fromtimestamp( self.timestamp )
+		except ValueError: # utorrent 2.2 sometimes gives too large timestamp
+			pass
+
+
+class RssFeed:
+	
+	id = 0
+	enabled = False
+	use_feed_title = False
+	user_selected = False
+	programmed = False
+	download_state = 0
+	url = ""
+	next_update = 0
+	entries = None
+
+	def __init__( self, feed ):
+		self.fill( feed )
+
+	def __str__( self ):
+		return "{: <3} {: <3} {}".format( self.id, "on" if self.enabled else "off", self.url )
+
+	def verbose_str( self ):
+		return "{} ({}/{}) update: {}".format(
+			str( self ), len( [ x for x in self.entries if x.in_history ] ), len( self.entries ), self.next_update
+		)
+
+	def fill( self, feed ):
+		self.id, self.enabled, self.use_feed_title, self.user_selected, self.programmed, \
+			self.download_state, self.url, self.next_update = feed[0:8]
+		self.next_update = datetime.datetime.fromtimestamp( self.next_update )
+		self.entries = []
+		for e in feed[8]:
+			self.entries.append( RssFeedEntry( e ) )
+
+	@classmethod
+	def get_readonly_attrs( cls ):
+		return ( "id", "use_feed_title", "user_selected", "programmed", "download_state", "next_update", "entries" )
+
+	@classmethod
+	def get_writeonly_attrs( cls ):
+		return ( "download_dir", "alias", "subscribe", "smart_filter" )
+
+	@classmethod
+	def get_public_attrs( cls ):
+		return tuple( set( _get_external_attrs( cls ) ) - set( cls.get_readonly_attrs() ) )
+
+
+class RssFilter:
+	
+	id = 0
+	flags = 0
+	name = ""
+	filter = None
+	not_filter = None
+	save_in = ""
+	feed_id = 0
+	quality = 0
+	label = ""
+	postpone_mode = False
+	last_match = 0
+	smart_ep_filter = 0
+	repack_ep_filter = 0
+	episode = ""
+	episode_filter = False
+	resolving_candidate = False
+	
+	def __init__( self, filter ):
+		self.fill( filter )
+
+	def __str__( self ):
+		return "{: <3} {: <3} {}".format( self.id, "on" if self.enabled else "off", self.name )
+
+	def verbose_str( self ):
+		return "{} {} -> {}: +{}-{}".format( str( self ), self.filter, self.save_in, self.filter, \
+			self.not_filter )
+		
+	def fill( self, filter ):
+		self.id, self.flags, self.name, self.filter, self.not_filter, self.save_in, self.feed_id, \
+			self.quality, self.label, self.postpone_mode, self.last_match, self.smart_ep_filter, \
+			self.repack_ep_filter, self.episode, self.episode_filter, self.resolving_candidate = filter
+		self.postpone_mode = bool( self.postpone_mode )
+
+	@classmethod
+	def get_readonly_attrs( cls ):
+		return ( "id", "flags", "last_match", "resolving_candidate", "enabled" )
+
+	@classmethod
+	def get_writeonly_attrs( cls ):
+		return ( "prio", "add_stopped" )
+
+	@classmethod
+	def get_public_attrs( cls ):
+		return tuple( set( _get_external_attrs( cls ) ) - set( cls.get_readonly_attrs() ) )
+
+	@property
+	def enabled( self ):
+		return bool( self.flags & 1 )
+
+	@enabled.setter
+	def enabled( self, val ):
+		self.flags |= int( val & 1 )
 
 
 class uTorrentConnection( http.client.HTTPConnection ):
@@ -562,7 +702,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 						continue
 					raise last_e
 				elif resp.status == 404 or resp.status == 401:
-					raise uTorrentError( resp.reason )
+					raise uTorrentError( "Request {}: {}".format( loc, resp.reason ) )
 				elif resp.status != 200:
 					raise uTorrentError( "{}: {}".format( resp.reason, resp.status ) )
 				self._cookies.extract_cookies( resp, self._request )
@@ -593,15 +733,20 @@ class uTorrentConnection( http.client.HTTPConnection ):
 			raise uTorrentError( "Can't fetch security token" )
 		self._token = match.group( 1 )
 
+	def _action_val( self, val ):
+		if isinstance( val, bool ):
+			val = int( val )
+		return str( val )
+
 	def _action( self, action, params = None, params_str = None ):
 		args = []
 		if params:
 			for k, v in params.items():
-				if isinstance( v, ( tuple, list ) ):
+				if is_list_type( v ):
 					for i in v:
-						args.append( "{}={}".format( url_quote( str( k ) ), url_quote( str( i ) ) ) )
+						args.append( "{}={}".format( url_quote( str( k ) ), url_quote( self._action_val( i ) ) ) )
 				else:
-					args.append( "{}={}".format( url_quote( str( k ) ), url_quote( str( v ) ) ) )
+					args.append( "{}={}".format( url_quote( str( k ) ), url_quote( self._action_val( v ) ) ) )
 		if params_str:
 			params_str = "&" + params_str
 		else:
@@ -661,8 +806,10 @@ class uTorrent:
 
 	_pathmodule = ntpath
 	
-	_list_cache = None
 	_list_cache_id = 0
+	_torrent_cache = None
+	_rssfeed_cache = None
+	_rssfilter_cache = None
 
 	api_version = 1 # http://forum.utorrent.com/viewtopic.php?id=25661
 
@@ -744,6 +891,33 @@ class uTorrent:
 		cls.check_hash( parent_hash )
 		return parent_hash, prop
 
+	def resolve_torrent_hashes( self, hashes, torrent_list = None ):
+		out = []
+		if torrent_list == None:
+			torrent_list = self.torrent_list()
+		for h in hashes:
+			if h in torrent_list:
+				out.append( torrent_list[h].name )
+		return out
+
+	def resolve_feed_ids( self, ids, rss_list = None ):
+		out = []
+		if rss_list == None:
+			rss_list = utorrent.rss_list()
+		for id in ids:
+			if int( id ) in rss_list:
+				out.append( rss_list[int( id )].url )
+		return out
+
+	def resolve_filter_ids( self, ids, filter_list = None ):
+		out = []
+		if filter_list == None:
+			filter_list = utorrent.rssfilter_list()
+		for id in ids:
+			if int( id ) in filter_list:
+				out.append( filter_list[int( id )].name )
+		return out
+
 	def _create_torrent_upload( self, torrent_data, torrent_filename ):
 		out = "\r\n".join( (
 			"--{{BOUNDARY}}",
@@ -792,24 +966,44 @@ class uTorrent:
 			self._version = Version( self.do_action( "start" ) )
 		return self._version
 
-	def torrent_list( self, labels = None ):
+	def _fetch_torrent_list( self ):
 		if self._list_cache_id:
-			res = self.do_action( "list", { "cid" : self._list_cache_id } )
-			for t in res["torrentm"]:
-				del self._list_cache[t]
-			for t in res["torrentp"]:
-				self._list_cache[t[0]] = self._TorrentClass( self, t )
+			out = self.do_action( "list", { "cid" : self._list_cache_id } )
+			# torrents
+			for t in out["torrentm"]:
+				del self._torrent_cache[t]
+			for t in out["torrentp"]:
+				self._torrent_cache[t[0]] = t
+			# feeds
+			for r in out["rssfeedm"]:
+				del self._rssfeed_cache[r]
+			for r in out["rssfeedp"]:
+				self._rssfeed_cache[r[0]] = r
+			# filters
+			for f in out["rssfilterm"]:
+				del self._rssfilter_cache[f]
+			for f in out["rssfilterp"]:
+				self._rssfilter_cache[f[0]] = f
 		else:
-			res = self.do_action( "list" )
-			self._list_cache = { hash : torrent for hash, torrent in [ ( i[0], self._TorrentClass( self, i ) ) for i in res["torrents"] ] }
-		self._list_cache_id = res["torrentc"]
+			out = self.do_action( "list" )
+			self._torrent_cache = { hash : torrent for hash, torrent in [ ( t[0], t ) for t in out["torrents"] ] }
+			self._rssfeed_cache = { id : feed for id, feed in [ ( r[0], r ) for r in out["rssfeeds"] ] }
+			self._rssfilter_cache = { id : filter for id, filter in [ ( f[0], f ) for f in out["rssfilters"] ] }
+		self._list_cache_id = out["torrentc"]
+		return out
+
+	def torrent_list( self, labels = None, rss_feeds = None, rss_filters = None ):
+		res = self._fetch_torrent_list()
+		out = { h : self._TorrentClass( self, t ) for h, t in self._torrent_cache.items() }
 		if labels != None:
 			labels.extend( [ Label( i ) for i in res["label"] ] )
-#		if rss_feeds != None:
-#			rss_feeds.extend( res["rssfeeds"] )
-#		if rss_filters != None:
-#			rss_filters.extend( res["rssfilters"] )
-		return self._list_cache
+		if rss_feeds != None:
+			for id, feed in self._rssfeed_cache.items():
+				rss_feeds[id] = RssFeed( feed )
+		if rss_filters != None:
+			for id, filter in self._rssfilter_cache.items():
+				rss_filters[id] = RssFilter( filter )
+		return out
 
 	def torrent_info( self, torrents ):
 		res = self.do_action( "getprops", { "hash" : self._get_hashes( torrents ) } )
@@ -941,6 +1135,16 @@ class uTorrent:
 			args.append( "s={}&v={}".format( url_quote( k ), url_quote( str( v ) ) ) )
 		self.do_action( "setsetting", params_str = "&".join( args ) )
 
+	def rss_list( self ):
+		rss_feeds = {}
+		self.torrent_list( rss_feeds = rss_feeds )
+		return rss_feeds
+
+	def rssfilter_list( self ):
+		rss_filters = {}
+		self.torrent_list( rss_filters = rss_filters )
+		return rss_filters
+
 
 class uTorrentFalcon( uTorrent ):
 
@@ -1006,33 +1210,78 @@ class uTorrentLinuxServer( uTorrent ):
 			out[name] = self._setting_val( type, value )
 		return out
 
+	def rss_add( self, url ):
+		return self.rss_update( -1, { "url" : url } )
+
+	def rss_update( self, feed_id, params ):
+		params["feed-id"] = feed_id
+		res = self.do_action( "rss-update", params )
+		if "rss_ident" in res:
+			return int( res["rss_ident"] )
+		return feed_id
+
+	def rss_remove( self, id ):
+		self.do_action( "rss-remove", { "feed-id" : id } )
+
+	def rssfilter_add( self, feed_id = -1 ):
+		return self.rssfilter_update( -1, { "feed-id" : feed_id } )
+
+	def rssfilter_update( self, filter_id, params ):
+		params["filter-id"] = filter_id
+		res = self.do_action( "filter-update", params )
+		if "filter_ident" in res:
+			return int( res["filter_ident"] )
+		return filter_id
+
+	def rssfilter_remove( self, id ):
+		self.do_action( "filter-remove", { "filter-id" : id } )
+
 
 if __name__ == "__main__":
 
 	import optparse, sys
 
+	level1 = "   "
+	level2 = level1 * 2
+	level3 = level1 * 3
+	
 	print_orig = print
 
 	def print( *objs, sep = " ", end = "\n", file = sys.stdout ):
 		global print_orig
 		print_orig( *map( lambda x: str( x ).encode( sys.stdout.encoding, "replace" ).decode( sys.stdout.encoding ), objs ), sep = sep, end = end, file = file )
 
-	level1 = "\t"
-	level2 = "\t" * 2
-	
+	def dump_writer( obj, props, level1 = level2, level2 = level3 ):
+		for name in props:
+			print( level1 + name, end = "" )
+			try:
+				value = getattr( obj, name )
+				if is_list_type( value ):
+					print( ":" )
+					for item in value:
+						if opts.verbose and hasattr( item, "verbose_str" ):
+							item_str = item.verbose_str()
+						else:
+							item_str = str( item )
+						print( level2 + item_str )
+				else:
+					print( " = {}".format( value ) )
+			except AttributeError:
+				print()
+
 	parser = optparse.OptionParser()
 	parser.add_option( "-H", "--host", dest = "host", default = utorrentcfg["host"], help = "host of uTorrent (hostname:port)" )
 	parser.add_option( "-U", "--user", dest = "user", default = utorrentcfg["login"], help = "WebUI login" )
 	parser.add_option( "-P", "--password", dest = "password", default = utorrentcfg["password"], help = "WebUI password" )
-	parser.add_option( "--nv", "--no-verbose", action = "store_false", dest = "verbose", default = True, help = "show shortened info in most cases (quicker, saves network traffic)" )
+	parser.add_option( "-n", "--nv", "--no-verbose", action = "store_false", dest = "verbose", default = True, help = "show shortened info in most cases (quicker, saves network traffic)" )
 	parser.add_option( "--server-version", action = "store_const", dest = "action", const = "server_version", help = "print uTorrent server version" )
 	parser.add_option( "-l", "--list-torrents", action = "store_const", dest = "action", const = "torrent_list", help = "list all torrents" )
 	parser.add_option( "-c", "--active", action = "store_true", dest = "active", default = False, help = "when listing torrents display only active ones (speed > 0)" )
 	parser.add_option( "--label", dest = "label", help = "when listing torrents display only ones with specified label" )
 	parser.add_option( "-s", "--sort", default = "name", dest = "sort_field", help = "sort torrents, values are: availability, dl_remain, dl_speed, downloaded, eta, hash, label, name, peers_connected, peers_total, progress, queue_order, ratio, seeds_connected, seeds_total, size, status, ul_speed, uploaded; +server: url, rss_url; +falcon: added_on" )
 	parser.add_option( "--desc", action = "store_true", dest = "sort_desc", default = False, help = "sort torrents in descending order" )
-	parser.add_option( "-a", "--add-file", action = "store_const", dest = "action", const = "add_file", help = "add torrents specified by local file names" )
-	parser.add_option( "-u", "--add-url", action = "store_const", dest = "action", const = "add_url", help = "add torrents specified by urls" )
+	parser.add_option( "-a", "--add-file", action = "store_const", dest = "action", const = "add_file", help = "add torrents specified by local file names (filename filename ...)" )
+	parser.add_option( "-u", "--add-url", action = "store_const", dest = "action", const = "add_url", help = "add torrents specified by urls (url url ...)" )
 	parser.add_option( "--dir", dest = "download_dir", help = "directory to download added torrent, absolute or relative to current download dir (only for --add)" )
 	parser.add_option( "--settings", action = "store_const", dest = "action", const = "settings_get", help = "show current server settings, optionally you can use specific setting keys (name name ...)" )
 	parser.add_option( "--set", action = "store_const", dest = "action", const = "settings_set", help = "assign settings value (key1=value1 key2=value2 ...)" )
@@ -1042,7 +1291,7 @@ if __name__ == "__main__":
 	parser.add_option( "--resume", action = "store_const", dest = "action", const = "torrent_resume", help = "resume torrents (hash hash ...)" )
 	parser.add_option( "--recheck", action = "store_const", dest = "action", const = "torrent_recheck", help = "recheck torrents, torrent must be stopped first (hash hash ...)" )
 	parser.add_option( "--remove", action = "store_const", dest = "action", const = "torrent_remove", help = "remove torrents (hash hash ...)" )
-	parser.add_option( "--all", action = "store_true", dest = "all", default = False, help = "applies action to all torrents (for start, stop, pause, resume and recheck)" )
+	parser.add_option( "--all", action = "store_true", dest = "all", default = False, help = "applies action to all torrents/rss feeds (for start, stop, pause, resume, recheck, rss-update)" )
 	parser.add_option( "-F", "--force", action = "store_true", dest = "force", default = False, help = "forces current command (for start and remove)" )
 	parser.add_option( "--data", action = "store_true", dest = "with_data", default = False, help = "when removing torrent also remove its data (for remove, also enabled by --force)" )
 	parser.add_option( "--torrent", action = "store_true", dest = "with_torrent", default = False, help = "when removing torrent also remove its torrent file (for remove with uTorrent server, also enabled by --force)" )
@@ -1050,7 +1299,17 @@ if __name__ == "__main__":
 	parser.add_option( "--dump", action = "store_const", dest = "action", const = "torrent_dump", help = "show full torrent info in key=value view (hash hash ...)" )
 	parser.add_option( "--download", action = "store_const", dest = "action", const = "download_file", help = "downloads specified file (hash.file_index)" )
 	parser.add_option( "--set-file-prio", action = "store_const", dest = "action", const = "set_file_priority", help = "sets specified file priority, if you omit file_index then priority will be set for all files (hash[.file_index]=prio hash[.file_index]=prio ...) prio=0..3" )
-	parser.add_option( "--set-props", action = "store_const", dest = "action", const = "set_props", help = "change properties of torrent, e.g. label; use --dump to view them (hash.name=value hash.name=value ...)" )
+	parser.add_option( "--set-props", action = "store_const", dest = "action", const = "set_props", help = "change properties of torrent, e.g. label; use --dump to view them (hash.prop=value hash.prop=value ...)" )
+	parser.add_option( "--rss-list", action = "store_const", dest = "action", const = "rss_list", help = "list all rss feeds and filters" )
+	parser.add_option( "--rss-add", action = "store_const", dest = "action", const = "rss_add", help = "add rss feeds specified by urls (uTorrent server only) (feed_url feed_url ...)" )
+	parser.add_option( "--rss-update", action = "store_const", dest = "action", const = "rss_update", help = "forces update of the specified rss feeds (uTorrent server only) (feed_id feed_id ...)" )
+	parser.add_option( "--rss-remove", action = "store_const", dest = "action", const = "rss_remove", help = "removes rss feeds specified by ids (uTorrent server only) (feed_id feed_id ...)" )
+	parser.add_option( "--rss-dump", action = "store_const", dest = "action", const = "rss_dump", help = "show full rss feed info in key=value view (feed_id feed_id ...)" )
+	parser.add_option( "--rss-set-props", action = "store_const", dest = "action", const = "rss_set_props", help = "change properties of rss feed; use --rss-dump to view them (uTorrent server only) (feed_id.prop=value feed_id.prop=value ...)" )
+	parser.add_option( "--rssfilter-add", action = "store_const", dest = "action", const = "rssfilter_add", help = "add filters for specified rss feeds (uTorrent server only) (feed_id feed_id ...)" )
+	parser.add_option( "--rssfilter-remove", action = "store_const", dest = "action", const = "rssfilter_remove", help = "removes rss filter specified by ids (uTorrent server only) (filter_id filter_id ...)" )
+	parser.add_option( "--rssfilter-dump", action = "store_const", dest = "action", const = "rssfilter_dump", help = "show full rss filter info in key=value view (filter_id filter_id ...)" )
+	parser.add_option( "--rssfilter-set-props", action = "store_const", dest = "action", const = "rssfilter_set_props", help = "change properties of rss filter; use --rssfilter-dump to view them (uTorrent server only) (filter_id.prop=value filter_id.prop=value ...)" )
 	parser.add_option( "--magnet", action = "store_const", dest = "action", const = "get_magnet", help = "generate magnet link for the specified torrents (hash hash ...)" )
 	opts, args = parser.parse_args()
 	
@@ -1060,14 +1319,11 @@ if __name__ == "__main__":
 			utorrent = uTorrentConnection( opts.host, opts.user, opts.password ).utorrent()
 
 		if opts.action == "server_version":
-			if opts.verbose:
-				print( utorrent.version().verbose_str() )
-			else:
-				print( utorrent.version() )
+			print( utorrent.version().verbose_str() if opts.verbose else utorrent.version() )
 
 		elif opts.action == "torrent_list":
 			total_ul, total_dl, count, total_size = 0, 0, 0, 0
-			if not opts.sort_field in utorrent.TorrentClass.get_sortable_attrs():
+			if not opts.sort_field in utorrent.TorrentClass.get_public_attrs():
 				opts.sort_field = "name"
 			for h, t in sorted( utorrent.torrent_list().items(), key = lambda x: getattr( x[1], opts.sort_field ), reverse = opts.sort_desc ):
 				if not opts.active or opts.active and ( t.ul_speed > 0 or t.dl_speed > 0 ): # handle --active
@@ -1106,47 +1362,81 @@ if __name__ == "__main__":
 			utorrent.settings_set( { k : v for k, v in [ i.split( "=" ) for i in args] } )
 
 		elif opts.action == "torrent_start":
+			torr_list = None
 			if opts.all:
-				args = utorrent.torrent_list().keys()
+				torr_list = utorrent.torrent_list()
+				args = torr_list.keys()
 				print( "Starting all torrents..." )
 			else:
-				print( "Starting " + ", ".join( args ) + "..." )
+				if opts.verbose:
+					torrs = utorrent.resolve_torrent_hashes( args, torr_list )
+				else:
+					torrs = args
+				print( "Starting " + ", ".join( torrs ) + "..." )
 			utorrent.torrent_start( args, opts.force )
 
 		elif opts.action == "torrent_stop":
+			torr_list = None
 			if opts.all:
-				args = utorrent.torrent_list().keys()
+				torr_list = utorrent.torrent_list()
+				args = torr_list.keys()
 				print( "Stopping all torrents..." )
 			else:
-				print( "Stopping " + ", ".join( args ) + "..." )
+				if opts.verbose:
+					torrs = utorrent.resolve_torrent_hashes( args, torr_list )
+				else:
+					torrs = args
+				print( "Stopping " + ", ".join( torrs ) + "..." )
 			utorrent.torrent_stop( args )
 
 		elif opts.action == "torrent_resume":
+			torr_list = None
 			if opts.all:
-				args = utorrent.torrent_list().keys()
+				torr_list = utorrent.torrent_list()
+				args = torr_list.keys()
 				print( "Resuming all torrents..." )
 			else:
-				print( "Resuming " + ", ".join( args ) + "..." )
+				if opts.verbose:
+					torrs = utorrent.resolve_torrent_hashes( args, torr_list )
+				else:
+					torrs = args
+				print( "Resuming " + ", ".join( torrs ) + "..." )
 			utorrent.torrent_resume( args )
 
 		elif opts.action == "torrent_pause":
+			torr_list = None
 			if opts.all:
-				args = utorrent.torrent_list().keys()
+				torr_list = utorrent.torrent_list()
+				args = torr_list.keys()
 				print( "Pausing all torrents..." )
 			else:
-				print( "Pausing " + ", ".join( args ) + "..." )
+				if opts.verbose:
+					torrs = utorrent.resolve_torrent_hashes( args, torr_list )
+				else:
+					torrs = args
+				print( "Pausing " + ", ".join( torrs ) + "..." )
 			utorrent.torrent_pause( args )
 
 		elif opts.action == "torrent_recheck":
+			torr_list = None
 			if opts.all:
-				args = utorrent.torrent_list().keys()
+				torr_list = utorrent.torrent_list()
+				args = torr_list.keys()
 				print( "Queuing recheck for all torrents..." )
 			else:
-				print( "Queuing recheck " + ", ".join( args ) + "..." )
+				if opts.verbose:
+					torrs = utorrent.resolve_torrent_hashes( args, torr_list )
+				else:
+					torrs = args
+				print( "Queuing recheck " + ", ".join( torrs ) + "..." )
 			utorrent.torrent_recheck( args )
 
 		elif opts.action == "torrent_remove":
-			print( "Removing " + ", ".join( args ) + "..." )
+			if opts.verbose:
+				torrs = utorrent.resolve_torrent_hashes( args )
+			else:
+				torrs = args
+			print( "Removing " + ", ".join( torrs ) + "..." )
 			if utorrent.api_version == uTorrentLinuxServer.api_version:
 				utorrent.torrent_remove( args, opts.with_data or opts.force, opts.with_torrent or opts.force )
 			else:
@@ -1157,20 +1447,11 @@ if __name__ == "__main__":
 			files = utorrent.file_list( args )
 			infos = utorrent.torrent_info( args )
 			for hsh, fls in files.items():
-				if opts.verbose:
-					print( tors[hsh].verbose_str() )
-				else:
-					print( tors[hsh] )
-				if opts.verbose:
-					print( level1 + infos[hsh].verbose_str() )
-				else:
-					print( level1 + str( infos[hsh] ) )
+				print( tors[hsh].verbose_str() if opts.verbose else tors[hsh] )
+				print( level1 + ( infos[hsh].verbose_str() if opts.verbose else str( infos[hsh] ) ) )
 				print( level1 + "Files:" )
 				for f in fls:
-					if opts.verbose:
-						print( level2 + f.verbose_str() )
-					else:
-						print( level2 + str( f ) )
+					print( level2 + ( f.verbose_str() if opts.verbose else str( f ) ) )
 				print( level1 + "Trackers:" )
 				for tr in infos[hsh].trackers:
 					print( level2 + tr )
@@ -1179,20 +1460,12 @@ if __name__ == "__main__":
 			tors = utorrent.torrent_list()
 			infos = utorrent.torrent_info( args )
 			for hsh, info in infos.items():
-				if opts.verbose:
-					print( tors[hsh].verbose_str() )
-				else:
-					print( tors[hsh] )
+				print( tors[hsh].verbose_str() if opts.verbose else tors[hsh] )
+				print( level1 + "Properties:" )
+				dump_writer( tors[hsh], tors[hsh].get_public_attrs() )
+				dump_writer( info, info.get_public_attrs() )
 				print( level1 + "Read-only:" )
-				for name, value in sorted( tors[hsh].dump().items() ):
-					if name != "label":
-						if hasattr( tors[hsh], name + "_h" ):
-							value = "{} ({})".format( value, getattr( tors[hsh], name + "_h" ) )
-						print( level2 + "{} = {}".format( name, value ) )
-				print( level1 + "Changeable:" )
-				for name, value in sorted( itertools.chain( info.dump().items(), ( ( "label", tors[hsh].label ), ) ) ):
-					if name != "trackers":
-						print( level2 + "{} = {}".format( name, value ) )
+				dump_writer( tors[hsh], tors[hsh].get_readonly_attrs() )
 
 		elif opts.action == "download_file":
 			if utorrent.api_version != uTorrentLinuxServer.api_version:
@@ -1245,14 +1518,119 @@ if __name__ == "__main__":
 				props.append( { hsh : { name : value } } )
 			utorrent.torrent_set_props( props )
 
+		elif opts.action == "rss_list":
+			rssfeeds = {}
+			rssfilters = {}
+			utorrent.torrent_list( None, rssfeeds, rssfilters )
+			feed_id_index = {}
+			for id, filter in rssfilters.items():
+				if not filter.feed_id in feed_id_index:
+					feed_id_index[filter.feed_id] = []
+				feed_id_index[filter.feed_id].append( filter )
+			print( "Feeds:" )
+			for feed_id, feed in rssfeeds.items():
+				print( level1 + ( feed.verbose_str() if opts.verbose else str( feed ) ) )
+				if feed_id in feed_id_index:
+					print( level1 + "Filters:" )
+					for filter in feed_id_index[feed_id]:
+						print( level2 + ( filter.verbose_str() if opts.verbose else str( filter ) ) )
+			if -1 in feed_id_index and len( feed_id_index[-1] ) > 0:
+				print( "Global filters:" )
+				for filter in feed_id_index[-1]:
+					print( level1 + ( filter.verbose_str() if opts.verbose else str( filter ) ) )
+
+		elif opts.action == "rss_add":
+			for url in args:
+				print( "Adding {}...".format( url ) )
+				id = utorrent.rss_add( url )
+				if id != -1:
+					print( level1 + "Feed id = {} (add a filter to it to make it download something)".format( id ) )
+				else:
+					print( level1 + "Failed to add feed" )
+
+		elif opts.action == "rss_update":
+			feed_list = None
+			if opts.all:
+				feed_list = utorrent.rss_list()
+				args = list( map( str, feed_list.keys() ) )
+				print( "Updating all rss feeds..." )
+			else:
+				if opts.verbose:
+					feeds = utorrent.resolve_feed_ids( args, feed_list )
+				else:
+					feeds = args
+				print( "Updating " + ", ".join( feeds ) + "..." )
+			for id in args:
+				utorrent.rss_update( id, { "update" : 1 } )
+
+		elif opts.action == "rss_remove":
+			if opts.verbose:
+				feeds = utorrent.resolve_feed_ids( args )
+			else:
+				feeds = args
+			print( "Removing " + ", ".join( feeds ) + "..." )
+			for id in args:
+				utorrent.rss_remove( id )
+
+		elif opts.action == "rss_dump":
+			feeds = utorrent.rss_list()
+			for id, feed in { i : f for i, f in feeds.items() if str( i ) in args }.items():
+				print( feed.url )
+				print( level1 + "Properties:" )
+				dump_writer( feed, feed.get_public_attrs() )
+				print( level1 + "Read-only:" )
+				dump_writer( feed, feed.get_readonly_attrs() )
+				print( level1 + "Write-only:" )
+				dump_writer( feed, feed.get_writeonly_attrs() )
+
+		elif opts.action == "rss_set_props":
+			for a in args:
+				id, value = a.split( "=", 1 )
+				id, name = id.split( ".", 1 )
+				if name in RssFeed.get_public_attrs() or name in RssFeed.get_writeonly_attrs():
+					utorrent.rss_update( id, { name : value } )
+
+		elif opts.action == "rssfilter_add":
+			for feed_id in args:
+				print( "Adding filter for feed {}...".format( feed_id ) )
+				id = utorrent.rssfilter_add( feed_id )
+				if id != -1:
+					print( level1 + "Filter id = {}".format( id ) )
+				else:
+					print( level1 + "Failed to add filter" )
+
+		elif opts.action == "rssfilter_remove":
+			if opts.verbose:
+				feeds = utorrent.resolve_filter_ids( args )
+			else:
+				feeds = args
+			print( "Removing " + ", ".join( feeds ) + "..." )
+			for id in args:
+				utorrent.rssfilter_remove( id )
+
+		elif opts.action == "rssfilter_dump":
+			filters = utorrent.rssfilter_list()
+			for id, filter in { i : f for i, f in filters.items() if str( i ) in args }.items():
+				print( filter.name )
+				print( level1 + "Properties:" )
+				dump_writer( filter, filter.get_public_attrs() )
+				print( level1 + "Read-only:" )
+				dump_writer( filter, filter.get_readonly_attrs() )
+				print( level1 + "Write-only:" )
+				dump_writer( filter, filter.get_writeonly_attrs() )
+
+		elif opts.action == "rssfilter_set_props":
+			for a in args:
+				id, value = a.split( "=", 1 )
+				id, name = id.split( ".", 1 )
+				if name in RssFilter.get_public_attrs() or RssFilter.get_writeonly_attrs():
+					utorrent.rssfilter_update( id, { name.replace( "_", "-" ) : value } )
+
 		elif opts.action == "get_magnet":
 			if opts.verbose:
 				tors = utorrent.torrent_list()
 			for hsh, lnk in utorrent.torrent_get_magnet( args ).items():
-				if opts.verbose:
-					print( tors[hsh] )
-				else:
-					print( hsh )
+				print( tors[hsh] if opts.verbose else hsh )
 				print( level1 + lnk )
 
 		else:

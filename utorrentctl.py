@@ -467,7 +467,7 @@ class JobInfo_API1_9:
 		return "Limits D:{} U:{}".format( self.dlrate, self.ulrate )
 
 	def verbose_str( self ):
-		return str( self ) + "  Superseed:{};  DHT:{}  PEX:{}  Queuing override:{}  Seed ratio:{}  Seed time:{}".format(
+		return str( self ) + "  Superseed:{}  DHT:{}  PEX:{}  Queuing override:{}  Seed ratio:{}  Seed time:{}".format(
 			self._tribool_status_str( self.superseed ), self._tribool_status_str( self.dht ),
 			self._tribool_status_str( self.pex ), self._tribool_status_str( self.seed_override ), self.seed_ratio,
 			uTorrent.human_time_delta( self.seed_time )

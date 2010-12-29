@@ -178,7 +178,7 @@ class TorrentStatus:
 	checked = False
 	error = False
 	paused = False
-	queued = False
+	queued = False # queued == False means forced
 	loaded = False
 
 	def __init__( self, status, percent_loaded = 0 ):

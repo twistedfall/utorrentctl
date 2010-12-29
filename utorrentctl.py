@@ -184,14 +184,14 @@ class TorrentStatus:
 	def __init__( self, status, percent_loaded = 0 ):
 		self._value = status
 		self._progress = percent_loaded
-		self.started = status & 1
-		self.checking = status & 2
-		self.start_after_check = status & 4
-		self.checked = status & 8
-		self.error = status & 16
-		self.paused = status & 32
-		self.queued = status & 64
-		self.loaded = status & 128
+		self.started = bool( status & 1 )
+		self.checking = bool( status & 2 )
+		self.start_after_check = bool( status & 4 )
+		self.checked = bool( status & 8 )
+		self.error = bool( status & 16 )
+		self.paused = bool( status & 32 )
+		self.queued = bool( status & 64 )
+		self.loaded = bool( status & 128 )
 
 	# http://forum.utorrent.com/viewtopic.php?pid=381527#p381527
 	def __str__( self ):

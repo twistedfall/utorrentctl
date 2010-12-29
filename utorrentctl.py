@@ -1286,10 +1286,10 @@ if __name__ == "__main__":
 	parser.add_option( "--stop", action = "store_const", dest = "action", const = "torrent_stop", help = "stop torrents (hash hash ...)" )
 	parser.add_option( "--pause", action = "store_const", dest = "action", const = "torrent_pause", help = "pause torrents (hash hash ...)" )
 	parser.add_option( "--resume", action = "store_const", dest = "action", const = "torrent_resume", help = "resume torrents (hash hash ...)" )
-	parser.add_option( "--recheck", action = "store_const", dest = "action", const = "torrent_recheck", help = "recheck torrents, torrent must be stopped first (hash hash ...)" )
+	parser.add_option( "--recheck", action = "store_const", dest = "action", const = "torrent_recheck", help = "recheck torrents, torrent will be stopped and restarted if needed (hash hash ...)" )
 	parser.add_option( "--remove", action = "store_const", dest = "action", const = "torrent_remove", help = "remove torrents (hash hash ...)" )
 	parser.add_option( "--all", action = "store_true", dest = "all", default = False, help = "applies action to all torrents/rss feeds (for start, stop, pause, resume, recheck, rss-update)" )
-	parser.add_option( "-F", "--force", action = "store_true", dest = "force", default = False, help = "forces current command (for start and remove)" )
+	parser.add_option( "-F", "--force", action = "store_true", dest = "force", default = False, help = "forces current command (for start, recheck (with all) and remove)" )
 	parser.add_option( "--data", action = "store_true", dest = "with_data", default = False, help = "when removing torrent also remove its data (for remove, also enabled by --force)" )
 	parser.add_option( "--torrent", action = "store_true", dest = "with_torrent", default = False, help = "when removing torrent also remove its torrent file (for remove with uTorrent server, also enabled by --force)" )
 	parser.add_option( "-i", "--info", action = "store_const", dest = "action", const = "torrent_info", help = "show info and file/trackers list for the specified torrents (hash hash ...)" )
@@ -1415,18 +1415,26 @@ if __name__ == "__main__":
 			utorrent.torrent_pause( args )
 
 		elif opts.action == "torrent_recheck":
-			torr_list = None
+			torr_list = utorrent.torrent_list()
 			if opts.all:
-				torr_list = utorrent.torrent_list()
-				args = torr_list.keys()
-				print( "Queuing recheck for all torrents..." )
+				if opts.force:
+					args = torr_list.keys()
+					print( "Rechecking all torrents..." )
+				else:
+					raise uTorrentError( "Refusing to recheck all torrents! Please specify --force to override" )
 			else:
 				if opts.verbose:
 					torrs = utorrent.resolve_torrent_hashes( args, torr_list )
 				else:
 					torrs = args
-				print( "Queuing recheck " + ", ".join( torrs ) + "..." )
-			utorrent.torrent_recheck( args )
+				print( "Rechecking " + ", ".join( torrs ) + "..." )
+			for hsh in args:
+				if hsh in torr_list:
+					torr = torr_list[hsh]
+					torr.stop()
+					torr.recheck()
+					if ( torr.status.started and not torr.status.paused ) or torr.status.error:
+						torr.start( not( torr.status.queued or torr.status.error ) )
 
 		elif opts.action == "torrent_remove":
 			if opts.verbose:

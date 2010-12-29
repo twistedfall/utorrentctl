@@ -663,7 +663,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 		http.client.HTTPConnection.__init__( self, self._request.host, timeout = 10 )
 		self._fetch_token()
 
-	def _get_data( self, loc, data = None, retry = True, save_to_file = None, progress_cb = None ):
+	def _get_data( self, loc, data = None, retry = True, save_buffer = None, progress_cb = None ):
 		last_e = None
 		utserver_retries = 0
 		retries = 0
@@ -678,7 +678,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 				self._request.add_data( data )
 				self.request( self._request.get_method(), self._request.get_selector() + loc, self._request.get_data(), headers )
 				resp = self.getresponse()
-				if save_to_file:
+				if save_buffer:
 					read = 0
 					resp_len = resp.length
 					while True:
@@ -688,7 +688,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 							progress_cb( read, resp_len )
 						if len( buf ) == 0:
 							break
-						save_to_file.write( buf )
+						save_buffer.write( buf )
 					return None
 				out = resp.read().decode( "utf8" )
 				if resp.status == 400:
@@ -760,8 +760,8 @@ class uTorrentConnection( http.client.HTTPConnection ):
 			section = "gui/"
 		return section + "?" + "&".join( args ) + params_str
 
-	def do_action( self, action, params = None, params_str = None, data = None, retry = True, save_to_file = None, progress_cb = None ):
-		# uTorrent can send incorrect overlapping array objects, this will fix them, converting them into list
+	def do_action( self, action, params = None, params_str = None, data = None, retry = True, save_buffer = None, progress_cb = None ):
+		# uTorrent can send incorrect overlapping array objects, this will fix them, converting them to list
 		def obj_hook( obj ):
 			out = {}
 			for k, v in obj:
@@ -770,7 +770,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 				else:
 					out[k] = v
 			return out
-		res = self._get_data( self._action( action, params, params_str ), data = data, retry = retry, save_to_file = save_to_file, progress_cb = progress_cb )
+		res = self._get_data( self._action( action, params, params_str ), data = data, retry = retry, save_buffer = save_buffer, progress_cb = progress_cb )
 		if res:
 			return json.loads( res, object_pairs_hook = obj_hook )
 		else:
@@ -955,8 +955,8 @@ class uTorrent:
 		if prev_dir:
 			self.settings_set( { "dir_active_download" : prev_dir } )
 
-	def do_action( self, action, params = None, params_str = None, data = None, retry = True, save_to_file = None, progress_cb = None ):
-		return self._connection.do_action( action = action, params = params, params_str = params_str, data = data, retry = retry, save_to_file = save_to_file, progress_cb = progress_cb )
+	def do_action( self, action, params = None, params_str = None, data = None, retry = True, save_buffer = None, progress_cb = None ):
+		return self._connection.do_action( action = action, params = params, params_str = params_str, data = data, retry = retry, save_buffer = save_buffer, progress_cb = progress_cb )
 
 	def version( self ):
 		if not self._version:
@@ -1198,7 +1198,7 @@ class uTorrentLinuxServer( uTorrent ):
 
 	def file_get( self, file_hash, buffer, progress_cb = None ):
 		parent_hash, index = self.parse_hash_prop( file_hash )
-		self.do_action( "proxy", { "id" : parent_hash, "file" : index }, save_to_file = buffer, progress_cb = progress_cb )
+		self.do_action( "proxy", { "id" : parent_hash, "file" : index }, save_buffer = buffer, progress_cb = progress_cb )
 
 	def settings_get( self, extended_attributes = False ):
 		res = self.do_action( "getsettings" )

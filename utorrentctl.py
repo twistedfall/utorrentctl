@@ -109,7 +109,7 @@ def _get_external_attrs( cls ):
 
 
 def is_list_type( obj ):
-	return isinstance( obj, ( tuple, list, set ) )
+	return hasattr( obj, "__iter__" ) and not isinstance( obj, str );
 
 
 class uTorrentError( Exception ):
@@ -931,7 +931,7 @@ class uTorrent:
 		return out
 
 	def _get_hashes( self, torrents ):
-		if not hasattr( torrents, "__iter__" ) or isinstance( torrents, str ):
+		if not is_list_type( torrents ):
 			torrents = ( torrents, )
 		out = []
 		for t in torrents:

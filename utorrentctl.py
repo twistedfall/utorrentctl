@@ -528,8 +528,8 @@ class RssFeedEntry:
 		return "{}".format( self.name )
 
 	def verbose_str( self ):
-		return "{:1} {}".format( '*' if self.in_history else ' ', self.name_full )
-		
+		return "{} {}".format( '*' if self.in_history else ' ', self.name_full )
+
 	def fill( self, entry ):
 		self.name, self.name_full, self.url, self.quality, self.codec, self.timestamp, self.season, self.episode, \
 			self.episode_to, self.feed_id, self.repack, self.in_history = entry

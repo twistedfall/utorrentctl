@@ -165,10 +165,11 @@ class Version:
 			self.major, self.middle, self.minor, self.build, self.engine, self.ui
 		)
 
+
 class TorrentStatus:
 
 	_progress = 0
-	
+
 	_value = 0
 
 	started = False
@@ -338,7 +339,7 @@ class Torrent_API2( Torrent ):
 	def fill( self, torrent ):
 		Torrent.fill( self, torrent[0:19] )
 		self.url, self.rss_url, self.status_message, self._unk_hash = torrent[19:]
-	
+
 	def remove( self, with_data = False, with_torrent = False ):
 		return self._utorrent.torrent_remove( self, with_data, with_torrent )
 
@@ -498,7 +499,7 @@ class JobInfo( JobInfo_API1_9 ):
 	ulslots = 0
 
 	def verbose_str( self ):
-		return "{};  Upload slots:{}".format( JobInfo_API1_9.verbose_str( self ), self.ulslots ) 
+		return "{};  Upload slots:{}".format( JobInfo_API1_9.verbose_str( self ), self.ulslots )
 
 	def fill( self, jobinfo ):
 		JobInfo_API1_9.fill( self, jobinfo )
@@ -506,7 +507,7 @@ class JobInfo( JobInfo_API1_9 ):
 
 
 class RssFeedEntry:
-	
+
 	name = ""
 	name_full = ""
 	url = ""
@@ -525,7 +526,7 @@ class RssFeedEntry:
 
 	def __str__( self ):
 		return "{}".format( self.name )
-		
+
 	def verbose_str( self ):
 		return "{:1} {}".format( '*' if self.in_history else ' ', self.name_full )
 		
@@ -539,7 +540,7 @@ class RssFeedEntry:
 
 
 class RssFeed:
-	
+
 	id = 0
 	enabled = False
 	use_feed_title = False
@@ -583,7 +584,7 @@ class RssFeed:
 
 
 class RssFilter:
-	
+
 	id = 0
 	flags = 0
 	name = ""
@@ -600,7 +601,7 @@ class RssFilter:
 	episode = ""
 	episode_filter = False
 	resolving_candidate = False
-	
+
 	def __init__( self, filter ):
 		self.fill( filter )
 
@@ -610,7 +611,7 @@ class RssFilter:
 	def verbose_str( self ):
 		return "{} {} -> {}: +{}-{}".format( str( self ), self.filter, self.save_in, self.filter, \
 			self.not_filter )
-		
+
 	def fill( self, filter ):
 		self.id, self.flags, self.name, self.filter, self.not_filter, self.save_in, self.feed_id, \
 			self.quality, self.label, self.postpone_mode, self.last_match, self.smart_ep_filter, \
@@ -651,7 +652,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 	_retry_max = 3
 
 	_utorrent = None
-	
+
 	@property
 	def request_obj( self ):
 		return self._request
@@ -805,7 +806,7 @@ class uTorrent:
 	_FileClass = File
 
 	_pathmodule = ntpath
-	
+
 	_list_cache_id = 0
 	_torrent_cache = None
 	_rssfeed_cache = None
@@ -1244,7 +1245,7 @@ if __name__ == "__main__":
 	level1 = "   "
 	level2 = level1 * 2
 	level3 = level1 * 3
-	
+
 	print_orig = print
 
 	def print( *objs, sep = " ", end = "\n", file = sys.stdout ):
@@ -1312,7 +1313,7 @@ if __name__ == "__main__":
 	parser.add_option( "--rssfilter-set-props", action = "store_const", dest = "action", const = "rssfilter_set_props", help = "change properties of rss filter; use --rssfilter-dump to view them (uTorrent server only) (filter_id.prop=value filter_id.prop=value ...)" )
 	parser.add_option( "--magnet", action = "store_const", dest = "action", const = "get_magnet", help = "generate magnet link for the specified torrents (hash hash ...)" )
 	opts, args = parser.parse_args()
-	
+
 	try:
 
 		if opts.action != None:

@@ -634,10 +634,6 @@ class RssFilter:
 	def enabled( self ):
 		return bool( self.flags & 1 )
 
-	@enabled.setter
-	def enabled( self, val ):
-		self.flags |= int( val & 1 )
-
 
 class uTorrentConnection( http.client.HTTPConnection ):
 

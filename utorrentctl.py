@@ -81,11 +81,6 @@ def bencode( obj, str_encoding = "utf8" ):
 	t = type( obj )
 	if t == int:
 		out.extend( "i{}e".format( obj ).encode( str_encoding ) )
-	elif is_list_type( obj ):
-		out.extend( b"l" )
-		for e in map( bencode, obj ):
-			out.extend( e )
-		out.extend( b"e" )
 	elif t == dict:
 		out.extend( b"d" )
 		for k in sorted( obj.keys() ):
@@ -96,6 +91,11 @@ def bencode( obj, str_encoding = "utf8" ):
 		out.extend( str( len( obj ) ).encode( str_encoding ) )
 		out.extend( b":" )
 		out.extend( obj )
+	elif is_list_type( obj ):
+		out.extend( b"l" )
+		for e in map( bencode, obj ):
+			out.extend( e )
+		out.extend( b"e" )
 	else:
 		obj = str( obj ).encode( str_encoding )
 		out.extend( str( len( obj ) ).encode( str_encoding ) )
@@ -109,7 +109,7 @@ def _get_external_attrs( cls ):
 
 
 def is_list_type( obj ):
-	return hasattr( obj, "__iter__" ) and not isinstance( obj, str );
+	return hasattr( obj, "__iter__" ) and not isinstance( obj, ( str, bytes ) );
 
 
 class uTorrentError( Exception ):

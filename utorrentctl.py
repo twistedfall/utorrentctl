@@ -1014,6 +1014,11 @@ class uTorrent:
 		self._handle_prev_dir( prev_dir )
 		if "error" in res:
 			raise uTorrentError( res["error"] )
+		if url[0:7] == "magnet:":
+			m = re.search( "urn:btih:([0-9A-F]{40})", url, re.IGNORECASE )
+			if m:
+				return m.group( 1 ).upper()
+		return None
 
 	def torrent_add_data( self, torrent_data, download_dir = None, filename = "default.torrent" ):
 		prev_dir = self._handle_download_dir( download_dir )
@@ -1348,7 +1353,9 @@ if __name__ == "__main__":
 		elif opts.action == "add_url":
 			for i in args:
 				print( "Submitting {}...".format( i ) )
-				utorrent.torrent_add_url( i, opts.download_dir )
+				hash = utorrent.torrent_add_url( i, opts.download_dir )
+				if hash != None:
+					print( level1 + "Info hash = {}".format( hash ) )
 
 		elif opts.action == "settings_get":
 			for i in utorrent.settings_get().items():

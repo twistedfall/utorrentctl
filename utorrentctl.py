@@ -29,7 +29,7 @@ def url_quote( string ):
 try:
 	from config import utorrentcfg
 except ImportError:
-	utorrentcfg = { "host" : None, "login" : None, "password" : None  }
+	utorrentcfg = { "host" : None, "login" : None, "password" : None }
 
 
 def bdecode( data, str_encoding = "utf8" ):
@@ -1300,7 +1300,7 @@ if __name__ == "__main__":
 	parser.add_option( "-i", "--info", action = "store_const", dest = "action", const = "torrent_info", help = "show info and file/trackers list for the specified torrents (hash hash ...)" )
 	parser.add_option( "--dump", action = "store_const", dest = "action", const = "torrent_dump", help = "show full torrent info in key=value view (hash hash ...)" )
 	parser.add_option( "--download", action = "store_const", dest = "action", const = "download_file", help = "downloads specified file (hash.file_index)" )
-	parser.add_option( "--set-file-prio", action = "store_const", dest = "action", const = "set_file_priority", help = "sets specified file priority, if you omit file_index then priority will be set for all files (hash[.file_index]=prio hash[.file_index]=prio ...) prio=0..3" )
+	parser.add_option( "--set-file-prio", action = "store_const", dest = "action", const = "set_file_priority", help = "sets specified file priority, if you omit file_index then priority will be set for all files (hash[.file_index][=prio] hash[.file_index][=prio] ...) prio=0..3, if not specified then 2 is by default" )
 	parser.add_option( "--set-props", action = "store_const", dest = "action", const = "set_props", help = "change properties of torrent, e.g. label; use --dump to view them (hash.prop=value hash.prop=value ...)" )
 	parser.add_option( "--rss-list", action = "store_const", dest = "action", const = "rss_list", help = "list all rss feeds and filters" )
 	parser.add_option( "--rss-add", action = "store_const", dest = "action", const = "rss_add", help = "add rss feeds specified by urls (uTorrent server only) (feed_url feed_url ...)" )
@@ -1520,7 +1520,14 @@ if __name__ == "__main__":
 			print( "" )
 
 		elif opts.action == "set_file_priority":
-			utorrent.file_set_priority( { k : v for k, v in [ i.split( "=" ) for i in args ] } )
+			prios = {}
+			for i in args:
+				parts = i.split( "=" )
+				if len( parts ) == 2:
+					prios[parts[0]] = parts[1]
+				else:
+					prios[parts[0]] = "2"
+			utorrent.file_set_priority( prios )
 
 		elif opts.action == "set_props":
 			props = []

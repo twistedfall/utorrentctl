@@ -1358,7 +1358,7 @@ if __name__ == "__main__":
 					print( level1 + "Info hash = {}".format( hash ) )
 
 		elif opts.action == "settings_get":
-			for i in utorrent.settings_get().items():
+			for i in sorted( utorrent.settings_get().items() ):
 				if len( args ) == 0 or i[0] in args:
 					print( "{} = {}".format( *i ) )
 

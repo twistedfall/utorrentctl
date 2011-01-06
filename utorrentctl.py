@@ -1461,7 +1461,7 @@ if __name__ == "__main__":
 			for hsh, fls in files.items():
 				print( tors[hsh].verbose_str() if opts.verbose else tors[hsh] )
 				print( level1 + ( infos[hsh].verbose_str() if opts.verbose else str( infos[hsh] ) ) )
-				print( level1 + "Files:" )
+				print( level1 + "Files ({}):".format( len( fls ) ) )
 				for f in fls:
 					print( level2 + ( f.verbose_str() if opts.verbose else str( f ) ) )
 				print( level1 + "Trackers:" )

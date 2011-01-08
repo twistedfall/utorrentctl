@@ -1300,7 +1300,7 @@ if __name__ == "__main__":
 	parser.add_option( "-i", "--info", action = "store_const", dest = "action", const = "torrent_info", help = "show info and file/trackers list for the specified torrents (hash hash ...)" )
 	parser.add_option( "--dump", action = "store_const", dest = "action", const = "torrent_dump", help = "show full torrent info in key=value view (hash hash ...)" )
 	parser.add_option( "--download", action = "store_const", dest = "action", const = "download_file", help = "downloads specified file (hash.file_index)" )
-	parser.add_option( "--set-file-prio", action = "store_const", dest = "action", const = "set_file_priority", help = "sets specified file priority, if you omit file_index then priority will be set for all files (hash[.file_index][=prio] hash[.file_index][=prio] ...) prio=0..3, if not specified then 2 is by default" )
+	parser.add_option( "--prio", action = "store_const", dest = "action", const = "set_file_priority", help = "sets specified file priority, if you omit file_index then priority will be set for all files (hash[.file_index][=prio] hash[.file_index][=prio] ...) prio=0..3, if not specified then 2 is by default" )
 	parser.add_option( "--set-props", action = "store_const", dest = "action", const = "set_props", help = "change properties of torrent, e.g. label; use --dump to view them (hash.prop=value hash.prop=value ...)" )
 	parser.add_option( "--rss-list", action = "store_const", dest = "action", const = "rss_list", help = "list all rss feeds and filters" )
 	parser.add_option( "--rss-add", action = "store_const", dest = "action", const = "rss_add", help = "add rss feeds specified by urls (uTorrent server only) (feed_url feed_url ...)" )

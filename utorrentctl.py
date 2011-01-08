@@ -1282,8 +1282,8 @@ if __name__ == "__main__":
 	parser.add_option( "--label", dest = "label", help = "when listing torrents display only ones with specified label" )
 	parser.add_option( "-s", "--sort", default = "name", dest = "sort_field", help = "sort torrents, values are: availability, dl_remain, dl_speed, downloaded, eta, hash, label, name, peers_connected, peers_total, progress, queue_order, ratio, seeds_connected, seeds_total, size, status, ul_speed, uploaded; +server: url, rss_url; +falcon: added_on" )
 	parser.add_option( "--desc", action = "store_true", dest = "sort_desc", default = False, help = "sort torrents in descending order" )
-	parser.add_option( "-a", "--add-file", action = "store_const", dest = "action", const = "add_file", help = "add torrents specified by local file names (filename filename ...)" )
-	parser.add_option( "-u", "--add-url", action = "store_const", dest = "action", const = "add_url", help = "add torrents specified by urls (url url ...)" )
+	parser.add_option( "-a", "--add-file", action = "store_const", dest = "action", const = "add_file", help = "add torrents specified by local file names, with force flag will force-start torrent after adding (filename filename ...)" )
+	parser.add_option( "-u", "--add-url", action = "store_const", dest = "action", const = "add_url", help = "add torrents specified by urls, with force flag will force-start torrent after adding magnet url (url url ...)" )
 	parser.add_option( "--dir", dest = "download_dir", help = "directory to download added torrent, absolute or relative to current download dir (only for --add)" )
 	parser.add_option( "--settings", action = "store_const", dest = "action", const = "settings_get", help = "show current server settings, optionally you can use specific setting keys (name name ...)" )
 	parser.add_option( "--set", action = "store_const", dest = "action", const = "settings_set", help = "assign settings value (key1=value1 key2=value2 ...)" )
@@ -1294,7 +1294,7 @@ if __name__ == "__main__":
 	parser.add_option( "--recheck", action = "store_const", dest = "action", const = "torrent_recheck", help = "recheck torrents, torrent will be stopped and restarted if needed (hash hash ...)" )
 	parser.add_option( "--remove", action = "store_const", dest = "action", const = "torrent_remove", help = "remove torrents (hash hash ...)" )
 	parser.add_option( "--all", action = "store_true", dest = "all", default = False, help = "applies action to all torrents/rss feeds (for start, stop, pause, resume, recheck, rss-update)" )
-	parser.add_option( "-F", "--force", action = "store_true", dest = "force", default = False, help = "forces current command (for start, recheck (with all) and remove)" )
+	parser.add_option( "-F", "--force", action = "store_true", dest = "force", default = False, help = "forces current command (for start, recheck (with all), remove, add-file, add-url)" )
 	parser.add_option( "--data", action = "store_true", dest = "with_data", default = False, help = "when removing torrent also remove its data (for remove, also enabled by --force)" )
 	parser.add_option( "--torrent", action = "store_true", dest = "with_torrent", default = False, help = "when removing torrent also remove its torrent file (for remove with uTorrent server, also enabled by --force)" )
 	parser.add_option( "-i", "--info", action = "store_const", dest = "action", const = "torrent_info", help = "show info and file/trackers list for the specified torrents (hash hash ...)" )
@@ -1349,6 +1349,9 @@ if __name__ == "__main__":
 				print( "Submitting {}...".format( i ) )
 				hash = utorrent.torrent_add_file( i, opts.download_dir )
 				print( level1 + "Info hash = {}".format( hash ) )
+				if opts.force:
+					print( level1 + "Forcing start..." )
+					utorrent.torrent_start( hash, True )
 
 		elif opts.action == "add_url":
 			for i in args:
@@ -1356,6 +1359,9 @@ if __name__ == "__main__":
 				hash = utorrent.torrent_add_url( i, opts.download_dir )
 				if hash != None:
 					print( level1 + "Info hash = {}".format( hash ) )
+					if opts.force:
+						print( level1 + "Forcing start..." )
+						utorrent.torrent_start( hash, True )
 
 		elif opts.action == "settings_get":
 			for i in sorted( utorrent.settings_get().items() ):

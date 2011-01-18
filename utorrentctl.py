@@ -335,25 +335,18 @@ class Torrent_API2( Torrent ):
 	rss_url = ""
 	status_message = ""
 	_unk_hash = ""
-
-	def fill( self, torrent ):
-		Torrent.fill( self, torrent[0:19] )
-		self.url, self.rss_url, self.status_message, self._unk_hash = torrent[19:]
-
-	def remove( self, with_data = False, with_torrent = False ):
-		return self._utorrent.torrent_remove( self, with_data, with_torrent )
-
-
-class Torrent_API1_9( Torrent_API2 ):
-
 	added_on = 0
 	_unk_num = 0
 	_unk_str = 0
 
 	def fill( self, torrent ):
-		Torrent_API2.fill( self, torrent[0:23] )
-		self.added_on, self._unk_num, self._unk_str = torrent[23:]
+		Torrent.fill( self, torrent[0:19] )
+		self.url, self.rss_url, self.status_message, self._unk_hash, self.added_on, \
+			self._unk_num, self._unk_str = torrent[19:]
 		self.added_on = datetime.datetime.fromtimestamp( self.added_on )
+
+	def remove( self, with_data = False, with_torrent = False ):
+		return self._utorrent.torrent_remove( self, with_data, with_torrent )
 
 
 class Label:
@@ -437,13 +430,13 @@ class File:
 		self._utorrent.file_set_priority( { self.hash : priority } )
 
 
-class File_API1_9( File ):
+class File_API2( File ):
 
 	def fill( self, file ):
 		File.fill( self, file[:4] )
 
 
-class JobInfo_API1_9:
+class JobInfo:
 
 	_utorrent = None
 
@@ -492,18 +485,6 @@ class JobInfo_API1_9:
 
 	def _tribool_status_str( self, status ):
 		return "not allowed" if status == -1 else ( "disabled" if status == 0 else "enabled" )
-
-
-class JobInfo( JobInfo_API1_9 ):
-
-	ulslots = 0
-
-	def verbose_str( self ):
-		return "{};  Upload slots:{}".format( JobInfo_API1_9.verbose_str( self ), self.ulslots )
-
-	def fill( self, jobinfo ):
-		JobInfo_API1_9.fill( self, jobinfo )
-		self.ulslots = jobinfo["ulslots"]
 
 
 class RssFeedEntry:
@@ -878,7 +859,7 @@ class uTorrent:
 
 	@classmethod
 	def parse_hash_prop( cls, hash_prop ):
-		if isinstance( hash_prop, ( File, Torrent, JobInfo_API1_9 ) ):
+		if isinstance( hash_prop, ( File, Torrent, JobInfo ) ):
 			hash_prop = hash_prop.hash
 		try:
 			parent_hash, prop = hash_prop.split( ".", 1 )
@@ -1150,9 +1131,9 @@ class uTorrent:
 
 class uTorrentFalcon( uTorrent ):
 
-	_TorrentClass = Torrent_API1_9
-	_JobInfoClass = JobInfo_API1_9
-	_FileClass = File_API1_9
+	_TorrentClass = Torrent_API2
+	_JobInfoClass = JobInfo
+	_FileClass = File_API2
 
 	api_version = 1.9
 	# no description yet, what I found out:
@@ -1173,6 +1154,7 @@ class uTorrentFalcon( uTorrent ):
 class uTorrentLinuxServer( uTorrent ):
 
 	_TorrentClass = Torrent_API2
+	_FileClass = File_API2
 
 	_pathmodule = posixpath
 
@@ -1280,7 +1262,7 @@ if __name__ == "__main__":
 	parser.add_option( "-l", "--list-torrents", action = "store_const", dest = "action", const = "torrent_list", help = "list all torrents" )
 	parser.add_option( "-c", "--active", action = "store_true", dest = "active", default = False, help = "when listing torrents display only active ones (speed > 0)" )
 	parser.add_option( "--label", dest = "label", help = "when listing torrents display only ones with specified label" )
-	parser.add_option( "-s", "--sort", default = "name", dest = "sort_field", help = "sort torrents, values are: availability, dl_remain, dl_speed, downloaded, eta, hash, label, name, peers_connected, peers_total, progress, queue_order, ratio, seeds_connected, seeds_total, size, status, ul_speed, uploaded; +server: url, rss_url; +falcon: added_on" )
+	parser.add_option( "-s", "--sort", default = "name", dest = "sort_field", help = "sort torrents, values are: availability, dl_remain, dl_speed, downloaded, eta, hash, label, name, peers_connected, peers_total, progress, queue_order, ratio, seeds_connected, seeds_total, size, status, ul_speed, uploaded; +server: url, rss_url, added_on" )
 	parser.add_option( "--desc", action = "store_true", dest = "sort_desc", default = False, help = "sort torrents in descending order" )
 	parser.add_option( "-a", "--add-file", action = "store_const", dest = "action", const = "add_file", help = "add torrents specified by local file names, with force flag will force-start torrent after adding (filename filename ...)" )
 	parser.add_option( "-u", "--add-url", action = "store_const", dest = "action", const = "add_url", help = "add torrents specified by urls, with force flag will force-start torrent after adding magnet url (url url ...)" )

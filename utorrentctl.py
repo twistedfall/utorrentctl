@@ -273,11 +273,14 @@ class Torrent:
 		return "{} {}".format( self.hash, self.name )
 
 	def verbose_str( self ):
-		return "{} {: <15} {: >5.1f}% {: >9} D:{: >14} U:{: >14} {: <8.3f} {: <9} eta: {: <7} {}{}".format(
+		if self.progress == 100:
+			peer_info = "{}/{}".format( self.peers_connected, self.peers_total )
+		else:
+			peer_info = "{}/{}".format( self.seeds_connected, self.seeds_total )
+		return "{} {: <15} {: >5.1f}% {: >9} D:{: >12} U:{: >12} {: <6.2f} {: <7} eta: {: <7} {}{}".format(
 			self.hash, self.status, self.progress, self.size_h,
 			self.dl_speed_h if self.dl_speed > 0 else "", self.ul_speed_h if self.ul_speed > 0 else "",
-			self.ratio, "{}({})/{}".format( self.seeds_connected, self.seeds_total, self.peers_connected ),
-			self.eta_h, self.name, " ({})".format( self.label ) if self.label else ""
+			self.ratio, peer_info, self.eta_h, self.name, " ({})".format( self.label ) if self.label else ""
 		)
 
 	def fill( self, torrent ):
@@ -1236,7 +1239,7 @@ if __name__ == "__main__":
 		print_orig( *map( lambda x: str( x ).encode( sys.stdout.encoding, "replace" ).decode( sys.stdout.encoding ), objs ), sep = sep, end = end, file = file )
 
 	def dump_writer( obj, props, level1 = level2, level2 = level3 ):
-		for name in props:
+		for name in sorted( props ):
 			print( level1 + name, end = "" )
 			try:
 				value = getattr( obj, name )

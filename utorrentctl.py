@@ -1279,12 +1279,12 @@ if __name__ == "__main__":
 	parser.add_option( "--recheck", action = "store_const", dest = "action", const = "torrent_recheck", help = "recheck torrents, torrent will be stopped and restarted if needed (hash hash ...)" )
 	parser.add_option( "--remove", action = "store_const", dest = "action", const = "torrent_remove", help = "remove torrents (hash hash ...)" )
 	parser.add_option( "--all", action = "store_true", dest = "all", default = False, help = "applies action to all torrents/rss feeds (for start, stop, pause, resume, recheck, rss-update)" )
-	parser.add_option( "-F", "--force", action = "store_true", dest = "force", default = False, help = "forces current command (for start, recheck (with all), remove, add-file, add-url)" )
+	parser.add_option( "-F", "--force", action = "store_true", dest = "force", default = False, help = "forces current command (for start, recheck (with all), remove, add-file, add-url, download)" )
 	parser.add_option( "--data", action = "store_true", dest = "with_data", default = False, help = "when removing torrent also remove its data (for remove, also enabled by --force)" )
 	parser.add_option( "--torrent", action = "store_true", dest = "with_torrent", default = False, help = "when removing torrent also remove its torrent file (for remove with uTorrent server, also enabled by --force)" )
 	parser.add_option( "-i", "--info", action = "store_const", dest = "action", const = "torrent_info", help = "show info and file/trackers list for the specified torrents (hash hash ...)" )
 	parser.add_option( "--dump", action = "store_const", dest = "action", const = "torrent_dump", help = "show full torrent info in key=value view (hash hash ...)" )
-	parser.add_option( "--download", action = "store_const", dest = "action", const = "download_file", help = "downloads specified file (hash.file_index)" )
+	parser.add_option( "--download", action = "store_const", dest = "action", const = "download", help = "downloads specified file, with force flag will overwrite all existing files (hash.file_index)" )
 	parser.add_option( "--prio", action = "store_const", dest = "action", const = "set_file_priority", help = "sets specified file priority, if you omit file_index then priority will be set for all files (hash[.file_index][=prio] hash[.file_index][=prio] ...) prio=0..3, if not specified then 2 is by default" )
 	parser.add_option( "--set-props", action = "store_const", dest = "action", const = "set_props", help = "change properties of torrent, e.g. label; use --dump to view them (hash.prop=value hash.prop=value ...)" )
 	parser.add_option( "--rss-list", action = "store_const", dest = "action", const = "rss_list", help = "list all rss feeds and filters" )
@@ -1470,45 +1470,68 @@ if __name__ == "__main__":
 				print( level1 + "Read-only:" )
 				dump_writer( tors[hsh], tors[hsh].get_readonly_attrs() )
 
-		elif opts.action == "download_file":
+		elif opts.action == "download":
 			if utorrent.api_version != uTorrentLinuxServer.api_version:
 				raise uTorrentError( "Downloading files only supported for uTorrent Server" )
-			parent_hash, index = uTorrent.parse_hash_prop( args[0] )
-			if index == None:
-				print( "Downloading whole torrent is not supported yet, please specify file index" )
-				sys.exit( 2 )
-			index = int( index )
-			files = utorrent.file_list( parent_hash )
-			if len( files ) == 0:
-				print( "Specified torrent or file does not exist" )
-				sys.exit( 1 )
-			filename = utorrent.pathmodule.basename( files[parent_hash][index].name )
-			print( "Downloading {}...".format( filename ) )
-			file = open( filename, "wb" )
-			bar_width = 50
-			size_calc = False
-			increm = 0
-			start_time = datetime.datetime.now()
-			def progress( loaded, total ):
-				global bar_width, size_calc, increm, start_time
-				if not size_calc:
-					size_calc = True
-					increm = round( total / bar_width )
-				progr = loaded // increm
-				delta = datetime.datetime.now() - start_time
-				delta = delta.seconds + delta.microseconds / 1000000
-				print( "[{}{}] {} {}/s eta: {}{}".format(
-					"*" * progr, "_" * ( bar_width - progr ),
-					uTorrent.human_size( total ),
-					uTorrent.human_size( loaded / delta ),
-					uTorrent.human_time_delta( ( total - loaded ) / ( loaded / delta ) ),
-					" " * 25
-					), sep = "", end = ""
-				)
-				print( "\b" * ( bar_width + 70 ), end = "" )
-				sys.stdout.flush()
-			utorrent.file_get( args[0], buffer = file, progress_cb = progress )
-			print( "" )
+			for filespec in args:
+				parent_hash, indices = uTorrent.parse_hash_prop( filespec )
+				files = utorrent.file_list( parent_hash )
+				if len( files ) == 0:
+					print( "Specified torrent or file does not exist" )
+					sys.exit( 1 )
+				make_tree = False # single file download => put it right in the current directory
+				torrents = None
+				if indices == None:
+					indices = [ i for i, f in enumerate( files[parent_hash] ) if f.progress == 100 and f.priority.value > 0 ]
+					make_tree = True # whole torrent download => keep directory tree
+					torrents = utorrent.torrent_list()
+				else:
+					indices = ( int( indices ), )
+
+				def progress( loaded, total ):
+					global bar_width, size_calc, increm, start_time
+					if not size_calc:
+						size_calc = True
+						increm = round( total / bar_width )
+					progr = round( loaded / increm )
+					delta = datetime.datetime.now() - start_time
+					delta = delta.seconds + delta.microseconds / 1000000
+					if opts.verbose:
+						print( "[{}{}] {} {}/s eta: {}{}".format(
+							"*" * progr, "_" * ( bar_width - progr ),
+							uTorrent.human_size( total ),
+							uTorrent.human_size( loaded / delta ),
+							uTorrent.human_time_delta( ( total - loaded ) / ( loaded / delta ) ),
+							" " * 25
+							), sep = "", end = ""
+						)
+						print( "\b" * ( bar_width + 70 ), end = "" )
+						sys.stdout.flush()
+
+				for index in indices:
+					if make_tree:
+						filename = torrents[parent_hash].name + os.path.sep + os.path.normpath( files[parent_hash][index].name )
+					else:
+						filename = utorrent.pathmodule.basename( files[parent_hash][index].name )
+					if os.path.exists( filename ) and os.path.getsize( filename ) > 0 and not opts.force:
+						print( "Skipping {}, already exists, specify --force to overwrite...".format( filename ) )
+					else:
+						try:
+							dir = os.path.dirname( filename )
+							if dir != "":
+								os.makedirs( dir )
+						except OSError as e:
+							if( e.args[0] != 17 ): # "File exists" => dir exists, by design, ignore
+								raise e
+						print( "Downloading {}...".format( filename ) )
+						file = open( filename, "wb" )
+						bar_width = 50
+						size_calc = False
+						increm = 0
+						start_time = datetime.datetime.now()
+						utorrent.file_get( "{}.{}".format( parent_hash, index ), buffer = file, progress_cb = progress )
+						if opts.verbose:
+							print( "" )
 
 		elif opts.action == "set_file_priority":
 			prios = {}

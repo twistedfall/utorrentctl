@@ -768,6 +768,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 		except uTorrentError as e:
 			if e.args[0] == "invalid request":
 				return uTorrentFalcon( self )
+			raise e
 		if ver.product == "server":
 			return uTorrentLinuxServer( self, ver )
 		else:

@@ -19,10 +19,22 @@
 	utorrentctl - uTorrent cli remote control utility and library
 """
 
-import urllib.request, http.client, http.cookiejar, urllib.parse, socket
-import base64, posixpath, ntpath, email.generator, os.path, datetime, errno
 from hashlib import sha1
-import re, json
+import base64
+import datetime
+import email.generator
+import errno
+import http.client
+import http.cookiejar
+import json
+import ntpath
+import os.path
+import posixpath
+import re
+import socket
+import time
+import urllib.parse
+import urllib.request
 
 def url_quote( string ):
 	return urllib.parse.quote( string, "" )

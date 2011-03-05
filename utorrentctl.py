@@ -1270,7 +1270,7 @@ if __name__ == "__main__":
 	parser.add_option( "-l", "--list-torrents", action = "store_const", dest = "action", const = "torrent_list", help = "list all torrents" )
 	parser.add_option( "-c", "--active", action = "store_true", dest = "active", default = False, help = "when listing torrents display only active ones (speed > 0)" )
 	parser.add_option( "--label", dest = "label", help = "when listing torrents display only ones with specified label" )
-	parser.add_option( "-s", "--sort", default = "name", dest = "sort_field", help = "sort torrents, values are: availability, dl_remain, dl_speed, downloaded, eta, hash, label, name, peers_connected, peers_total, progress, queue_order, ratio, seeds_connected, seeds_total, size, status, ul_speed, uploaded; +server: url, rss_url, added_on" )
+	parser.add_option( "-s", "--sort", default = "name", dest = "sort_field", help = "sort torrents, values are: availability, dl_remain, dl_speed, downloaded, eta, hash, label, name, peers_connected, peers_total, progress, queue_order, ratio, seeds_connected, seeds_total, size, status, ul_speed, uploaded; +server: url, rss_url, added_on, completed_on" )
 	parser.add_option( "--desc", action = "store_true", dest = "sort_desc", default = False, help = "sort torrents in descending order" )
 	parser.add_option( "-a", "--add-file", action = "store_const", dest = "action", const = "add_file", help = "add torrents specified by local file names, with force flag will force-start torrent after adding (filename filename ...)" )
 	parser.add_option( "-u", "--add-url", action = "store_const", dest = "action", const = "add_url", help = "add torrents specified by urls, with force flag will force-start torrent after adding magnet url (url url ...)" )

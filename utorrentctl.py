@@ -26,6 +26,7 @@ import re, json
 
 def url_quote( string ):
 	return urllib.parse.quote( string, "" )
+
 try:
 	from config import utorrentcfg
 except ImportError:
@@ -339,14 +340,18 @@ class Torrent_API2( Torrent ):
 	status_message = ""
 	_unk_hash = ""
 	added_on = 0
-	_unk_num = 0
+	completed_on = None
 	_unk_str = 0
+	download_dir = ""
 
 	def fill( self, torrent ):
 		Torrent.fill( self, torrent[0:19] )
 		self.url, self.rss_url, self.status_message, self._unk_hash, self.added_on, \
-			self._unk_num, self._unk_str = torrent[19:]
+			self.completed_on, self._unk_str, self.download_dir = torrent[19:27]
 		self.added_on = datetime.datetime.fromtimestamp( self.added_on )
+		print(self.completed_on)
+		if self.completed_on > 0:
+			self.completed_on = datetime.datetime.fromtimestamp( self.completed_on )
 
 	def remove( self, with_data = False, with_torrent = False ):
 		return self._utorrent.torrent_remove( self, with_data, with_torrent )
@@ -420,7 +425,7 @@ class File:
 		return "{: <44} [{: <15}] {: >5}% ({: >9} / {: >9}) {}".format( self.hash, self.priority, self.progress, self.downloaded_h, self.size_h, self.name )
 
 	def fill( self, file ):
-		self.name, self.size, self.downloaded, priority = file
+		self.name, self.size, self.downloaded, priority = file[:4]
 		self.priority = Priority( priority )
 		if self.size == 0:
 			self.progress = 100

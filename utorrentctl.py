@@ -788,14 +788,18 @@ class uTorrentConnection( http.client.HTTPConnection ):
 	def utorrent( self ):
 		try:
 			ver = Version( self.do_action( "getversion", retry = False ) )
-		except http.client.BadStatusLine:
-			return uTorrent( self )
 		except uTorrentError as e:
-			if e.args[0] == "invalid request":
-				return uTorrentFalcon( self )
-			raise e
+			if e.args[0] == "invalid request": # windows desktop uTorrent client
+				ver = Version( self.do_action( "start" ) )
+			else:
+				raise e
 		if ver.product == "server":
 			return uTorrentLinuxServer( self, ver )
+		elif ver.product == "desktop":
+			if ver.major == 3:
+				return uTorrentFalcon( self, ver )
+			else:
+				return uTorrent( self, ver )
 		else:
 			raise uTorrentError( "Unsupported WebAPI" )
 

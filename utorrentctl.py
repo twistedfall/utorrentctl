@@ -711,22 +711,22 @@ class uTorrentConnection( http.client.HTTPConnection ):
 			except socket.error as e:
 				if str( e ) == "timed out": # some peculiar handling for timeout error
 					last_e = uTorrentError( "Timeout after {} tries".format( max_retries ) )
-				elif e.errno == errno.ECONNREFUSED:
 					self.close()
+				elif e.errno == errno.ECONNREFUSED:
 					raise uTorrentError( e.strerror )
-				elif e.errno == 10054: # An existing connection was forcibly closed by the remote host, Windows 2003 specific problem
+				elif e.errno == 10053 or e.errno == 10054:
+					# 10053 - An established connection was aborted by the software in your host machine
+					# 10054 - An existing connection was forcibly closed by the remote host
 					last_e = e
 					self.close()
 					time.sleep( 2 )
 				else:
 					raise e
-			except http.client.CannotSendRequest as e:
+			except ( http.client.CannotSendRequest, http.client.BadStatusLine ) as e:
 				last_e = e
 				self.close()
-				errno.ECONNRESET
-			except http.client.BadStatusLine as e:
+			finally:
 				self.close()
-				raise e
 			retries += 1
 		if last_e:
 			self.close()

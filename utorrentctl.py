@@ -161,7 +161,7 @@ class Version:
 			# fill some partially made up values as desktop client doesn't provide full info, only build
 			self.product = "desktop"
 			self.build = self.engine = self.ui = res["build"]
-			build_versions = ( ( 23217, 3, 0, 0 ), ( 23071, 2, 2, 0 ), ( 0, 2, 0, 4 ) )
+			build_versions = ( ( 25031, 2, 2, 1 ), ( 24979, 3, 0, 0 ), ( 23217, 3, 0, 0 ), ( 23071, 2, 2, 0 ), ( 0, 2, 0, 4 ) )
 			for version in build_versions:
 				if self.build >= version[0]:
 					self.major, self.middle, self.minor = version[1:]

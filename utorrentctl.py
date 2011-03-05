@@ -707,15 +707,24 @@ class uTorrentConnection( http.client.HTTPConnection ):
 					self._request.add_header( "Cookie", "; ".join( [ "{}={}".format( url_quote( c.name ), url_quote( c.value ) ) for c in self._cookies ] ) )
 				return out
 			except socket.gaierror as e:
-				raise uTorrentError( e.args[1] )
+				raise uTorrentError( e.strerror )
 			except socket.error as e:
-				e = e.args[0]
-				if str( e ) == "timed out":
-					last_e = uTorrentError( "Timeout" )
-				elif e.args[0] == errno.ECONNREFUSED:
+				if str( e ) == "timed out": # some peculiar handling for timeout error
+					last_e = uTorrentError( "Timeout after {} tries".format( max_retries ) )
+				elif e.errno == errno.ECONNREFUSED:
 					self.close()
-					raise uTorrentError( e.args[1] )
-			except ( http.client.CannotSendRequest, http.client.BadStatusLine ) as e:
+					raise uTorrentError( e.strerror )
+				elif e.errno == 10054: # An existing connection was forcibly closed by the remote host, Windows 2003 specific problem
+					last_e = e
+					self.close()
+					time.sleep( 2 )
+				else:
+					raise e
+			except http.client.CannotSendRequest as e:
+				last_e = e
+				self.close()
+				errno.ECONNRESET
+			except http.client.BadStatusLine as e:
 				self.close()
 				raise e
 			retries += 1

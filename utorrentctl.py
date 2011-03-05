@@ -349,7 +349,6 @@ class Torrent_API2( Torrent ):
 		self.url, self.rss_url, self.status_message, self._unk_hash, self.added_on, \
 			self.completed_on, self._unk_str, self.download_dir = torrent[19:27]
 		self.added_on = datetime.datetime.fromtimestamp( self.added_on )
-		print(self.completed_on)
 		if self.completed_on > 0:
 			self.completed_on = datetime.datetime.fromtimestamp( self.completed_on )
 

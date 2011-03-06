@@ -143,6 +143,24 @@ class Version:
 	peer_id = ""
 	device_id = ""
 
+	@staticmethod
+	def detect_from_settings( settings ):
+		out = Version( settings )
+		falcon = False
+		for set in settings["settings"]:
+			if set[0] == "webui.uconnect_enable": # only Falcon has this setting
+				falcon = True
+				out.major = 3
+				out.middle = 0
+				out.minor = 0
+		if not falcon:
+			out.major = 2
+			out.middle = 2
+			out.minor = 0
+		out.user_agent = "BTWebClient/{}{}{}0({})".format( out.major, out.middle, out.minor, out.build )
+		out.peer_id = "UT{}{}{}0".format( out.major, out.middle, out.minor )
+		return out
+
 	def __init__( self, res ):
 		if "version" in res: # server returns full data
 			self.product = res["version"]["product_code"]
@@ -157,17 +175,12 @@ class Version:
 			self.user_agent = res["version"]["user_agent"]
 			self.peer_id = res["version"]["peer_id"]
 			self.device_id = res["version"]["device_id"]
-		else:
+		elif "build" in res:
 			# fill some partially made up values as desktop client doesn't provide full info, only build
 			self.product = "desktop"
 			self.build = self.engine = self.ui = res["build"]
-			build_versions = ( ( 25031, 2, 2, 1 ), ( 24979, 3, 0, 0 ), ( 23217, 3, 0, 0 ), ( 23071, 2, 2, 0 ), ( 0, 2, 0, 4 ) )
-			for version in build_versions:
-				if self.build >= version[0]:
-					self.major, self.middle, self.minor = version[1:]
-					break
-			self.user_agent = "BTWebClient/{}{}{}0({})".format( self.major, self.middle, self.minor, self.build )
-			self.peer_id = "UT{}{}{}0".format( self.major, self.middle, self.minor )
+		else:
+			raise uTorrentError( "Cannot detect version from the supplied server response" )
 
 	def __str__( self ):
 		return self.user_agent
@@ -790,7 +803,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 			ver = Version( self.do_action( "getversion", retry = False ) )
 		except uTorrentError as e:
 			if e.args[0] == "invalid request": # windows desktop uTorrent client
-				ver = Version( self.do_action( "start" ) )
+				ver = Version.detect_from_settings( self.do_action( "getsettings" ) )
 			else:
 				raise e
 		if ver.product == "server":
@@ -801,7 +814,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 			else:
 				return uTorrent( self, ver )
 		else:
-			raise uTorrentError( "Unsupported WebAPI" )
+			raise uTorrentError( "Unsupported WebUI API" )
 
 
 class uTorrent:

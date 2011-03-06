@@ -706,6 +706,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 				out = resp.read().decode( "utf8" )
 				if resp.status == 400:
 					last_e = uTorrentError( out.strip() )
+					# FIXME: most probably broken after recent fixes for Windows (closing connect after each _get_data)
 					# if uTorrent server alpha is bound to the same port as WebUI then it will respond with "invalid request" to the first request in the connection
 					if ( not self._utorrent or type( self._utorrent ) == uTorrentLinuxServer ) and utserver_retries == 0:
 						utserver_retries += 1
@@ -725,9 +726,10 @@ class uTorrentConnection( http.client.HTTPConnection ):
 				if str( e ) == "timed out": # some peculiar handling for timeout error
 					last_e = uTorrentError( "Timeout after {} tries".format( max_retries ) )
 					self.close()
-				elif e.errno == errno.ECONNREFUSED:
+				elif e.errno == errno.ECONNREFUSED or e.errno == errno.ECONNRESET:
 					raise uTorrentError( e.strerror )
 				elif e.errno == 10053 or e.errno == 10054:
+					# Windows specific socket errors:
 					# 10053 - An established connection was aborted by the software in your host machine
 					# 10054 - An existing connection was forcibly closed by the remote host
 					last_e = e

@@ -1359,6 +1359,7 @@ if __name__ == "__main__":
 
 		elif opts.action == "torrent_list":
 			total_ul, total_dl, count, total_size = 0, 0, 0, 0
+			opts.sort_field = opts.sort_field.lower()
 			if not opts.sort_field in utorrent.TorrentClass.get_public_attrs() + utorrent.TorrentClass.get_readonly_attrs():
 				opts.sort_field = "name"
 			for h, t in sorted( utorrent.torrent_list().items(), key = lambda x: getattr( x[1], opts.sort_field ), reverse = opts.sort_desc ):

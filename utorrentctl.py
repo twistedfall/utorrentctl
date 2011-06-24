@@ -374,8 +374,7 @@ class Torrent_API2( Torrent ):
 		self.url, self.rss_url, self.status_message, self._unk_hash, self.added_on, \
 			self.completed_on, self._unk_str, self.download_dir = torrent[19:27]
 		self.added_on = datetime.datetime.fromtimestamp( self.added_on )
-		if self.completed_on > 0:
-			self.completed_on = datetime.datetime.fromtimestamp( self.completed_on )
+		self.completed_on = datetime.datetime.fromtimestamp( int( self.completed_on ) )
 
 	def remove( self, with_data = False, with_torrent = False ):
 		return self._utorrent.torrent_remove( self, with_data, with_torrent )
@@ -1186,9 +1185,6 @@ class uTorrentFalcon( uTorrent ):
 	api_version = 1.9
 	# no description yet, what I found out:
 	# * no support for getversion
-	# * additional fields in Torrent (e.g. added on)
-	# * additional fields in File
-	# * no ulslots in job info
 	# * settings are received in APIv2 format with additional access field
 
 	def settings_get( self, extended_attributes = False ):

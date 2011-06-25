@@ -1264,6 +1264,12 @@ class uTorrentLinuxServer( uTorrent ):
 	def rssfilter_remove( self, id ):
 		self.do_action( "filter-remove", { "filter-id" : id } )
 
+	def xfer_history_get( self ):
+		return self.do_action( "getxferhist" )["transfer_history"]
+
+	def xfer_history_reset( self ):
+		self.do_action( "resetxferhist" )
+
 
 if __name__ == "__main__":
 
@@ -1326,6 +1332,8 @@ if __name__ == "__main__":
 	parser.add_option( "--torrent", action = "store_true", dest = "with_torrent", default = False, help = "when removing torrent also remove its torrent file (for remove with uTorrent server, also enabled by --force)" )
 	parser.add_option( "-i", "--info", action = "store_const", dest = "action", const = "torrent_info", help = "show info and file/trackers list for the specified torrents (hash hash ...)" )
 	parser.add_option( "--dump", action = "store_const", dest = "action", const = "torrent_dump", help = "show full torrent info in key=value view (hash hash ...)" )
+	parser.add_option( "--stats", action = "store_const", dest = "action", const = "stats", help = "display server download/upload statistics (uTorrent server only)" )
+	parser.add_option( "--reset-stats", action = "store_const", dest = "action", const = "reset_stats", help = "reset server download/upload statistics (uTorrent server only)" )
 	parser.add_option( "--download", action = "store_const", dest = "action", const = "download", help = "downloads specified file, with force flag will overwrite all existing files (hash.file_index)" )
 	parser.add_option( "--prio", action = "store_const", dest = "action", const = "set_file_priority", help = "sets specified file priority, if you omit file_index then priority will be set for all files (hash[.file_index][=prio] hash[.file_index][=prio] ...) prio=0..3, if not specified then 2 is by default" )
 	parser.add_option( "--set-props", action = "store_const", dest = "action", const = "set_props", help = "change properties of torrent, e.g. label; use --dump to view them (hash.prop=value hash.prop=value ...)" )
@@ -1519,6 +1527,45 @@ if __name__ == "__main__":
 				dump_writer( info, info.get_public_attrs() )
 				print( level1 + "Read-only:" )
 				dump_writer( tors[hsh], tors[hsh].get_readonly_attrs() )
+
+		elif opts.action == "stats":
+			res = utorrent.xfer_history_get()
+			excl_local = utorrent.settings_get()["net.limit_excludeslocal"]
+			torrents = utorrent.torrent_list()
+			today_start = datetime.datetime.now().replace( hour = 0, minute = 0, second = 0, microsecond = 0 )
+			period = len( res["daily_download"] )
+			period_start = today_start - datetime.timedelta( days = period - 1 )
+			
+			down_total_local = sum( res["daily_local_download"] )
+			down_total = sum( res["daily_download"] ) - ( down_total_local if excl_local else 0 )
+			up_total_local = sum( res["daily_local_upload"] )
+			up_total = sum( res["daily_upload"] ) - ( down_total_local if excl_local else 0 )
+			period_added_torrents = { k : v for k, v in torrents.items() if v.added_on >= period_start }
+			period_completed_torrents = { k : v for k, v in torrents.items() if v.completed_on >= period_start }
+			print( "Last {} days:".format( period ) )
+			print( level1 + "Downloaded: {} (+{} local)".format( uTorrent.human_size( down_total ), uTorrent.human_size( down_total_local ) ) )
+			print( level1 + "  Uploaded: {} (+{} local)".format( uTorrent.human_size( up_total ), uTorrent.human_size( up_total_local ) ) )
+			print( level1 + "     Total: {} (+{} local)".format( uTorrent.human_size( down_total + up_total ), uTorrent.human_size( down_total_local + up_total_local ) ) )
+			print( level1 + "Ratio: {:.2f}".format( up_total / down_total ) )
+			print( level1 + "Added torrents: {}".format( len( period_added_torrents ) ) )
+			print( level1 + "Completed torrents: {}".format( len( period_completed_torrents ) ) )
+			
+			down_day_local = res["daily_local_download"][0]
+			down_day = res["daily_download"][0] - ( down_day_local if excl_local else 0 )
+			up_day_local = res["daily_local_upload"][0]
+			up_day = res["daily_upload"][0] - ( up_day_local if excl_local else 0 )
+			today_added_torrents = { k : v for k, v in torrents.items() if v.added_on >= today_start }
+			today_completed_torrents = { k : v for k, v in torrents.items() if v.completed_on >= today_start }
+			print( "Today:" )
+			print( level1 + "Downloaded: {} (+{} local)".format( uTorrent.human_size( down_day ), uTorrent.human_size( down_day_local ) ) )
+			print( level1 + "  Uploaded: {} (+{} local)".format( uTorrent.human_size( up_day ), uTorrent.human_size( up_day_local ) ) )
+			print( level1 + "     Total: {} (+{} local)".format( uTorrent.human_size( down_day + up_day ), uTorrent.human_size( down_day_local + up_day_local ) ) )
+			print( level1 + "Ratio: {:.2f}".format( up_day / down_day ) )
+			print( level1 + "Added torrents: {}".format( len( today_added_torrents ) ) )
+			print( level1 + "Completed torrents: {}".format( len( today_completed_torrents ) ) )
+
+		elif opts.action == "reset_stats":
+			res = utorrent.xfer_history_reset()
 
 		elif opts.action == "download":
 			if utorrent.api_version != uTorrentLinuxServer.api_version:

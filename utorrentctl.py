@@ -684,7 +684,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 			try:
 				headers = { k : v for k, v in self._request.header_items() }
 				if data:
-					bnd = email.generator._make_boundary()
+					bnd = email.generator._make_boundary( data )
 					headers["Content-Type"] = "multipart/form-data; boundary={}".format( bnd )
 					data = data.replace( "{{BOUNDARY}}", bnd )
 				self._request.add_data( data )

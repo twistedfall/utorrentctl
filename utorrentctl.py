@@ -299,15 +299,12 @@ class Torrent:
 		return "{} {}".format( self.hash, self.name )
 
 	def verbose_str( self ):
-		if self.progress == 100:
-			peer_info = "{}/{}".format( self.peers_connected, self.peers_total )
-		else:
-			peer_info = "{}/{}".format( self.seeds_connected, self.seeds_total )
-		return "{} {: <15} {: >5.1f}% {: >9} D:{: >12} U:{: >12} {: <6.2f} {: <7} eta: {: <7} {}{}".format(
-			self.hash, self.status, self.progress, self.size_h,
-			self.dl_speed_h if self.dl_speed > 0 else "", self.ul_speed_h if self.ul_speed > 0 else "",
-			self.ratio, peer_info, self.eta_h, self.name, " ({})".format( self.label ) if self.label else ""
-		)
+		return "{0.hash} {0.status: <15} {0.progress: >5.1f}% {0.size_h: >9} D:{0.dl_speed_h: >12} U:{0.ul_speed_h: >12} " \
+			"{0.ratio: <6.2f} {peer_info: <7} eta: {0.eta_h: <7} {0.name}{label}".format(
+				self,
+				peer_info = "{0.peers_connected}/{0.peers_total}".format( self ) if self.progress == 100 else "{0.seeds_connected}/{0.seeds_total}".format( self ),
+				label = " ({})".format( self.label ) if self.label else ""
+			)
 
 	def fill( self, torrent ):
 		self.hash, status, self.name, self.size, progress, self.downloaded, \
@@ -321,8 +318,8 @@ class Torrent:
 		self.size_h = uTorrent.human_size( self.size )
 		self.uploaded_h = uTorrent.human_size( self.uploaded )
 		self.downloaded_h = uTorrent.human_size( self.downloaded )
-		self.ul_speed_h = uTorrent.human_size( self.ul_speed ) + "/s"
-		self.dl_speed_h = uTorrent.human_size( self.dl_speed ) + "/s"
+		self.ul_speed_h = uTorrent.human_size( self.ul_speed ) + "/s" if self.ul_speed > 0 else ""
+		self.dl_speed_h = uTorrent.human_size( self.dl_speed ) + "/s" if self.dl_speed > 0 else ""
 		self.eta_h = uTorrent.human_time_delta( self.eta )
 
 	@classmethod
@@ -368,6 +365,14 @@ class Torrent_API2( Torrent ):
 	completed_on = None
 	_unk_str = 0
 	download_dir = ""
+
+	def verbose_str( self ):
+		return "{0.hash} {0.status_message: <15} {0.progress: >5.1f}% {0.size_h: >9} D:{0.dl_speed_h: >12} U:{0.ul_speed_h: >12} " \
+			"{0.ratio: <6.2f} {peer_info: <7} eta: {0.eta_h: <7} {0.name}{label}".format(
+				self,
+				peer_info = "{0.peers_connected}/{0.peers_total}".format( self ) if self.progress == 100 else "{0.seeds_connected}/{0.seeds_total}".format( self ),
+				label = " ({})".format( self.label ) if self.label else ""
+			)
 
 	def fill( self, torrent ):
 		Torrent.fill( self, torrent[0:19] )

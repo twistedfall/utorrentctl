@@ -1360,7 +1360,10 @@ if __name__ == "__main__":
 							item_str = str( item )
 						print( level2 + item_str )
 				else:
-					print( " = {}".format( value ) )
+					if hasattr( obj, name + "_h" ):
+						print( " = {} ({})".format( value, getattr( obj, name + "_h" ) ) )
+					else:
+						print( " = {}".format( value ) )
 			except AttributeError:
 				print()
 

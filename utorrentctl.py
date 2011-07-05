@@ -927,7 +927,10 @@ class uTorrent:
 	def human_size( size, suffixes = ( "B", "kiB", "MiB", "GiB", "TiB" ) ):
 		for s in suffixes:
 			if size < 1024:
-				return "{:.2f}{}".format( round( size, 2 ), s )
+				if s == suffixes[0]:
+					return "{}{}".format( round( size, 0 ), s )
+				else:
+					return "{:.2f}{}".format( round( size, 2 ), s )
 			if s != suffixes[-1]:
 				size /= 1024.
 		return "{:.2f}{}".format( round( size, 2 ), suffixes[-1] )

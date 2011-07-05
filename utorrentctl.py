@@ -32,6 +32,7 @@ import os.path
 import posixpath
 import re
 import socket
+import string
 import time
 import urllib.parse
 import urllib.request
@@ -44,6 +45,8 @@ try:
 except ImportError:
 	utorrentcfg = { "host" : None, "login" : None, "password" : None }
 
+if not "default_torrent_format" in utorrentcfg:
+	utorrentcfg["default_torrent_format"] = None
 
 def bdecode( data, str_encoding = "utf8" ):
 	if not hasattr( data, "__next__" ):
@@ -287,8 +290,32 @@ class Torrent:
 	seeds_connected = 0
 	seeds_total = 0
 	availability = 0
+	availability_h = ""
 	queue_order = 0
 	dl_remain = 0
+	dl_remain_h = ""
+
+	_default_format = "{hash} {status} {progress}% {size} {dl_speed} {ul_speed} {ratio} {peer_info} eta: {eta} {name} {label}"
+	_default_format_specs = {
+		"status" : "{status: <15}",
+		"name" : "{name: <60}",
+		"size" : "{size_h: >9}",
+		"progress" : "{progress: >5.1f}",
+		"downloaded" : "{downloaded_h: >9}",
+		"uploaded" : "{uploaded_h: >9}",
+		"ratio" : "{ratio: <6.2f}",
+		"dl_speed" : "{dl_speed_h: >12}",
+		"ul_speed" : "{ul_speed_h: >12}",
+		"eta" : "{eta_h: <7}",
+		"label" : "{label}",
+		"peers_connected" : "{peers_connected: <4}",
+		"peers_total" : "{peers_total: <5}",
+		"seeds_connected" : "{seeds_connected: <4}",
+		"seeds_total" : "{seeds_total: <5}",
+		"peer_info" : "{peer_info: <7}",
+		"availability" : "{availability_h: >5.2}",
+		"dl_remain" : "{dl_remain_h: >9}",
+	}
 
 	def __init__( self, utorrent, torrent = None ):
 		self._utorrent = utorrent
@@ -298,13 +325,39 @@ class Torrent:
 	def __str__( self ):
 		return "{} {}".format( self.hash, self.name )
 
-	def verbose_str( self ):
-		return "{0.hash} {0.status: <15} {0.progress: >5.1f}% {0.size_h: >9} D:{0.dl_speed_h: >12} U:{0.ul_speed_h: >12} " \
-			"{0.ratio: <6.2f} {peer_info: <7} eta: {0.eta_h: <7} {0.name}{label}".format(
-				self,
-				peer_info = "{0.peers_connected}/{0.peers_total}".format( self ) if self.progress == 100 else "{0.seeds_connected}/{0.seeds_total}".format( self ),
-				label = " ({})".format( self.label ) if self.label else ""
-			)
+	def _process_format( self, format ):
+		out = []
+		args = dict( self.__dict__ )
+		args["peer_info"] = ( "{peers_connected}/{peers_total}" if args["progress"] == 100 else "{seeds_connected}/{seeds_total}" ).format( **args )
+		args["label"] = "({label})".format( **args ) if args["label"] != "" else ""
+		if args["dl_speed"] < 1024:
+			args["dl_speed_h"] = ""
+		if args["ul_speed"] < 1024:
+			args["ul_speed_h"] = ""
+		if args["dl_remain"] == 0:
+			args["dl_remain_h"] = ""
+		formatter = string.Formatter()
+		for literal_text, field_name, format_spec, conversion in formatter.parse( format ):
+			elem = { "before" : literal_text, "value" : "" }
+			if field_name != None:
+				def_field_name, def_format_spec, def_conversion = None, " <20", None
+				if field_name in self._default_format_specs:
+					def_field_name, def_format_spec, def_conversion = next( formatter.parse( self._default_format_specs[field_name] ) )[1:4]
+				val = formatter.get_field( field_name if def_field_name == None else def_field_name, None, args )[0]
+				val = formatter.convert_field( val, conversion if conversion != None else def_conversion )
+				val = formatter.format_field( val, format_spec if format_spec != "" else def_format_spec )
+				elem["value"] = val
+			out.append( elem )
+		return out
+
+	def _format_to_str( self, format_res ):
+		out = ""
+		for i in format_res:
+			out += i["before"] + i["value"]
+		return out.strip()
+
+	def verbose_str( self, format = None ):
+		return self._format_to_str( self._process_format( self._default_format if format == None else format ) )
 
 	def fill( self, torrent ):
 		self.hash, status, self.name, self.size, progress, self.downloaded, \
@@ -318,9 +371,11 @@ class Torrent:
 		self.size_h = uTorrent.human_size( self.size )
 		self.uploaded_h = uTorrent.human_size( self.uploaded )
 		self.downloaded_h = uTorrent.human_size( self.downloaded )
-		self.ul_speed_h = uTorrent.human_size( self.ul_speed ) + "/s" if self.ul_speed > 0 else ""
-		self.dl_speed_h = uTorrent.human_size( self.dl_speed ) + "/s" if self.dl_speed > 0 else ""
+		self.ul_speed_h = uTorrent.human_size( self.ul_speed ) + "/s"
+		self.dl_speed_h = uTorrent.human_size( self.dl_speed ) + "/s"
 		self.eta_h = uTorrent.human_time_delta( self.eta )
+		self.availability_h = self.availability / 65535.
+		self.dl_remain_h = uTorrent.human_size( self.dl_remain )
 
 	@classmethod
 	def get_readonly_attrs( cls ):
@@ -362,17 +417,15 @@ class Torrent_API2( Torrent ):
 	status_message = ""
 	_unk_hash = ""
 	added_on = 0
-	completed_on = None
+	completed_on = 0
 	_unk_str = 0
 	download_dir = ""
-
-	def verbose_str( self ):
-		return "{0.hash} {0.status_message: <15} {0.progress: >5.1f}% {0.size_h: >9} D:{0.dl_speed_h: >12} U:{0.ul_speed_h: >12} " \
-			"{0.ratio: <6.2f} {peer_info: <7} eta: {0.eta_h: <7} {0.name}{label}".format(
-				self,
-				peer_info = "{0.peers_connected}/{0.peers_total}".format( self ) if self.progress == 100 else "{0.seeds_connected}/{0.seeds_total}".format( self ),
-				label = " ({})".format( self.label ) if self.label else ""
-			)
+	
+	def __init__( self, utorrent, torrent = None ):
+		Torrent.__init__( self, utorrent, torrent )
+		self._default_format_specs["status"] = "{status_message: <15}"
+		self._default_format_specs["completed_on"] = "{completed_on!s}"
+		self._default_format_specs["added_on"] = "{added_on!s}"
 
 	def fill( self, torrent ):
 		Torrent.fill( self, torrent[0:19] )
@@ -1317,6 +1370,7 @@ if __name__ == "__main__":
 	parser.add_option( "--server-version", action = "store_const", dest = "action", const = "server_version", help = "print uTorrent server version" )
 	parser.add_option( "-l", "--list-torrents", action = "store_const", dest = "action", const = "torrent_list", help = "list all torrents" )
 	parser.add_option( "-c", "--active", action = "store_true", dest = "active", default = False, help = "when listing torrents display only active ones (speed > 0)" )
+	parser.add_option( "-f", "--format", default = utorrentcfg["default_torrent_format"], dest = "format", help = "display torrent list in specific format" )
 	parser.add_option( "--label", dest = "label", help = "when listing torrents display only ones with specified label" )
 	parser.add_option( "-s", "--sort", default = "name", dest = "sort_field", help = "sort torrents, values are: availability, dl_remain, dl_speed, downloaded, eta, hash, label, name, peers_connected, peers_total, progress, queue_order, ratio, seeds_connected, seeds_total, size, status, ul_speed, uploaded; +server: url, rss_url, added_on, completed_on" )
 	parser.add_option( "--desc", action = "store_true", dest = "sort_desc", default = False, help = "sort torrents in descending order" )
@@ -1381,7 +1435,7 @@ if __name__ == "__main__":
 						count += 1
 						total_size += t.progress / 100 * t.size
 						if opts.verbose:
-							print( t.verbose_str() )
+							print( t.verbose_str( opts.format ) )
 							total_ul += t.ul_speed
 							total_dl += t.dl_speed
 						else:
@@ -1513,7 +1567,7 @@ if __name__ == "__main__":
 			files = utorrent.file_list( args )
 			infos = utorrent.torrent_info( args )
 			for hsh, fls in files.items():
-				print( tors[hsh].verbose_str() if opts.verbose else tors[hsh] )
+				print( tors[hsh].verbose_str( opts.format ) if opts.verbose else tors[hsh] )
 				print( level1 + ( infos[hsh].verbose_str() if opts.verbose else str( infos[hsh] ) ) )
 				print( level1 + "Files ({}):".format( len( fls ) ) )
 				for f in fls:
@@ -1526,7 +1580,7 @@ if __name__ == "__main__":
 			tors = utorrent.torrent_list()
 			infos = utorrent.torrent_info( args )
 			for hsh, info in infos.items():
-				print( tors[hsh].verbose_str() if opts.verbose else tors[hsh] )
+				print( tors[hsh].verbose_str( opts.format ) if opts.verbose else tors[hsh] )
 				print( level1 + "Properties:" )
 				dump_writer( tors[hsh], tors[hsh].get_public_attrs() )
 				dump_writer( info, info.get_public_attrs() )

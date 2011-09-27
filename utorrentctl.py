@@ -150,8 +150,8 @@ class Version:
 	def detect_from_settings( settings ):
 		out = Version( settings )
 		falcon = False
-		for set in settings["settings"]:
-			if set[0] == "webui.uconnect_enable": # only Falcon has this setting
+		for setting in settings["settings"]:
+			if setting[0] == "webui.uconnect_enable": # only Falcon has this setting
 				falcon = True
 				out.major = 3
 				out.middle = 0
@@ -325,7 +325,7 @@ class Torrent:
 	def __str__( self ):
 		return "{} {}".format( self.hash, self.name )
 
-	def _process_format( self, format ):
+	def _process_format( self, format_string ):
 		out = []
 		args = dict( self.__dict__ )
 		args["peer_info"] = ( "{peers_connected}/{peers_total}" if args["progress"] == 100 else "{seeds_connected}/{seeds_total}" ).format( **args )
@@ -337,7 +337,7 @@ class Torrent:
 		if args["dl_remain"] == 0:
 			args["dl_remain_h"] = ""
 		formatter = string.Formatter()
-		for literal_text, field_name, format_spec, conversion in formatter.parse( format ):
+		for literal_text, field_name, format_spec, conversion in formatter.parse( format_string ):
 			elem = { "before" : literal_text, "value" : "" }
 			if field_name != None:
 				def_field_name, def_format_spec, def_conversion = None, " <20", None
@@ -356,8 +356,8 @@ class Torrent:
 			out += i["before"] + i["value"]
 		return out.strip()
 
-	def verbose_str( self, format = None ):
-		return self._format_to_str( self._process_format( self._default_format if format == None else format ) )
+	def verbose_str( self, format_string = None ):
+		return self._format_to_str( self._process_format( self._default_format if format_string == None else format_string ) )
 
 	def fill( self, torrent ):
 		self.hash, status, self.name, self.size, progress, self.downloaded, \
@@ -672,8 +672,8 @@ class RssFilter:
 	episode_filter = False
 	resolving_candidate = False
 
-	def __init__( self, filter ):
-		self.fill( filter )
+	def __init__( self, filter_props ):
+		self.fill( filter_props )
 
 	def __str__( self ):
 		return "{: <3} {: <3} {}".format( self.id, "on" if self.enabled else "off", self.name )
@@ -682,10 +682,10 @@ class RssFilter:
 		return "{} {} -> {}: +{}-{}".format( str( self ), self.filter, self.save_in, self.filter, \
 			self.not_filter )
 
-	def fill( self, filter ):
+	def fill( self, filter_props ):
 		self.id, self.flags, self.name, self.filter, self.not_filter, self.save_in, self.feed_id, \
 			self.quality, self.label, self.postpone_mode, self.last_match, self.smart_ep_filter, \
-			self.repack_ep_filter, self.episode, self.episode_filter, self.resolving_candidate = filter
+			self.repack_ep_filter, self.episode, self.episode_filter, self.resolving_candidate = filter_props
 		self.postpone_mode = bool( self.postpone_mode )
 
 	@classmethod
@@ -914,11 +914,11 @@ class uTorrent:
 		self._version = version
 
 	@staticmethod
-	def _setting_val( type, value ):
+	def _setting_val( value_type, value ):
 		# Falcon incorrectly sends type 0 and empty string for some fields (e.g. boss_pw and boss_key_salt)
-		if type == 0 and value != '': # int
+		if value_type == 0 and value != '': # int
 			return int( value )
-		elif type == 1 and value != '': # bool
+		elif value_type == 1 and value != '': # bool
 			return value == "true"
 		else:
 			return value

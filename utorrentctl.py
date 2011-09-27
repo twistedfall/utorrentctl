@@ -532,7 +532,9 @@ class JobInfo:
 	hash = ""
 	trackers = []
 	ulrate = 0
+	ulrate_h = ""
 	dlrate = 0
+	dlrate_h = ""
 	superseed = 0
 	dht = 0
 	pex = 0
@@ -560,7 +562,9 @@ class JobInfo:
 		self.hash = jobinfo["hash"]
 		self.trackers = jobinfo["trackers"].strip().split( "\r\n\r\n" )
 		self.ulrate = jobinfo["ulrate"]
+		self.ulrate_h = uTorrent.human_size( self.ulrate ) + "/s"
 		self.dlrate = jobinfo["dlrate"]
+		self.dlrate_h = uTorrent.human_size( self.dlrate ) + "/s"
 		self.superseed = jobinfo["superseed"]
 		self.dht = jobinfo["dht"]
 		self.pex = jobinfo["pex"]

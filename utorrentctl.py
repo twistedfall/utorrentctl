@@ -46,6 +46,9 @@ try:
 except ImportError:
 	utorrentcfg = { "host" : None, "login" : None, "password" : None }
 
+if not "api" in utorrentcfg:
+	utorrentcfg["api"] = None
+
 if not "default_torrent_format" in utorrentcfg:
 	utorrentcfg["default_torrent_format"] = None
 
@@ -1403,7 +1406,7 @@ if __name__ == "__main__":
 	parser.add_option( "-H", "--host", dest = "host", default = utorrentcfg["host"], help = "host of uTorrent (hostname:port)" )
 	parser.add_option( "-U", "--user", dest = "user", default = utorrentcfg["login"], help = "WebUI login" )
 	parser.add_option( "-P", "--password", dest = "password", default = utorrentcfg["password"], help = "WebUI password" )
-	parser.add_option( "--api", dest = "api", help = "Disable autodetection of server version and force specific API: linux, desktop (2.x), falcon (3.x)" )
+	parser.add_option( "--api", dest = "api", default = utorrentcfg["api"], help = "Disable autodetection of server version and force specific API: linux, desktop (2.x), falcon (3.x)" )
 	parser.add_option( "-n", "--nv", "--no-verbose", action = "store_false", dest = "verbose", default = True, help = "show shortened info in most cases (quicker, saves network traffic)" )
 	parser.add_option( "--server-version", action = "store_const", dest = "action", const = "server_version", help = "print uTorrent server version" )
 	parser.add_option( "-l", "--list-torrents", action = "store_const", dest = "action", const = "torrent_list", help = "list all torrents" )

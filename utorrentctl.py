@@ -1679,7 +1679,8 @@ if __name__ == "__main__":
 				torrents = None
 				if indices == None:
 					indices = [ i for i, f in enumerate( files[parent_hash] ) if f.progress == 100 and f.priority.value > 0 ]
-					make_tree = True # whole torrent download => keep directory tree
+					if len( files ) > 1:
+						make_tree = True # whole torrent download => keep directory tree
 					torrents = utorrent.torrent_list()
 				else:
 					indices = ( int( indices ), )

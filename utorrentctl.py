@@ -828,13 +828,13 @@ class uTorrentConnection( http.client.HTTPConnection ):
 		else:
 			params_str = ""
 		if action == "list":
-			args.insert( 0, "token=" + url_quote( self._token ) )
+			args.insert( 0, "token=" + self._token )
 			args.insert( 1, "list=1" )
 			section = "gui/"
 		elif action == "proxy":
 			section = "proxy"
 		else:
-			args.insert( 0, "token=" + url_quote( self._token ) )
+			args.insert( 0, "token=" + self._token )
 			args.insert( 1, "action=" + url_quote( str( action ) ) )
 			section = "gui/"
 		return section + "?" + "&".join( args ) + params_str

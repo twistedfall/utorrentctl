@@ -866,23 +866,30 @@ class uTorrentConnection( http.client.HTTPConnection ):
 		else:
 			return ""
 
-	def utorrent( self ):
-		try:
-			ver = Version( self.do_action( "getversion", retry = False ) )
-		except uTorrentError as e:
-			if e.args[0] == "invalid request": # windows desktop uTorrent client
-				ver = Version.detect_from_settings( self.do_action( "getsettings" ) )
+	def utorrent( self, api = None ):
+		if api == "linux":
+			return uTorrentLinuxServer( self )
+		elif api == "desktop":
+			return uTorrent( self )
+		elif api == "falcon":
+			return uTorrentFalcon( self )
+		else: # auto-detect
+			try:
+				ver = Version( self.do_action( "getversion", retry = False ) )
+			except uTorrentError as e:
+				if e.args[0] == "invalid request": # windows desktop uTorrent client
+					ver = Version.detect_from_settings( self.do_action( "getsettings" ) )
+				else:
+					raise e
+			if ver.product == "server":
+				return uTorrentLinuxServer( self, ver )
+			elif ver.product == "desktop":
+				if ver.major == 3:
+					return uTorrentFalcon( self, ver )
+				else:
+					return uTorrent( self, ver )
 			else:
-				raise e
-		if ver.product == "server":
-			return uTorrentLinuxServer( self, ver )
-		elif ver.product == "desktop":
-			if ver.major == 3:
-				return uTorrentFalcon( self, ver )
-			else:
-				return uTorrent( self, ver )
-		else:
-			raise uTorrentError( "Unsupported WebUI API" )
+				raise uTorrentError( "Unsupported WebUI API" )
 
 
 class uTorrent:
@@ -1404,10 +1411,10 @@ if __name__ == "__main__":
 				print( level1 * cur_level + ( leaf.verbose_str() if opts.verbose else str( leaf ) ) )
 
 	parser = optparse.OptionParser()
-	parser.add_option( "-H", "--host", dest = "host", default = utorrentcfg["host"], help = "host of uTorrent (hostname:port)" )
-	parser.add_option( "-U", "--user", dest = "user", default = utorrentcfg["login"], help = "WebUI login" )
-	parser.add_option( "-P", "--password", dest = "password", default = utorrentcfg["password"], help = "WebUI password" )
-	parser.add_option( "--api", dest = "api", default = utorrentcfg["api"], help = "Disable autodetection of server version and force specific API: linux, desktop (2.x), falcon (3.x)" )
+	parser.add_option( "-H", "--host", dest = "host", help = "host of uTorrent (hostname:port)" )
+	parser.add_option( "-U", "--user", dest = "user", help = "WebUI login" )
+	parser.add_option( "-P", "--password", dest = "password", help = "WebUI password" )
+	parser.add_option( "--api", dest = "api", help = "Disable autodetection of server version and force specific API: linux, desktop (2.x), falcon (3.x)" )
 	parser.add_option( "-n", "--nv", "--no-verbose", action = "store_false", dest = "verbose", default = True, help = "show shortened info in most cases (quicker, saves network traffic)" )
 	parser.add_option( "--server-version", action = "store_const", dest = "action", const = "server_version", help = "print uTorrent server version" )
 	parser.add_option( "-l", "--list-torrents", action = "store_const", dest = "action", const = "torrent_list", help = "list all torrents" )
@@ -1453,15 +1460,17 @@ if __name__ == "__main__":
 
 	try:
 
+		if opts.host == None: # we didn't supply host in command line => load auth data from config
+			opts.host = utorrentcfg["host"]
+			if opts.user == None:
+				opts.user = utorrentcfg["login"]
+			if opts.password == None:
+				opts.password = utorrentcfg["password"]
+			if opts.api == None:
+				opts.api = utorrentcfg["api"]
+
 		if opts.action != None:
-			if opts.api == "linux":
-				utorrent = uTorrentLinuxServer( uTorrentConnection( opts.host, opts.user, opts.password ) )
-			elif opts.api == "desktop":
-				utorrent = uTorrent( uTorrentConnection( opts.host, opts.user, opts.password ) )
-			elif opts.api == "falcon":
-				utorrent = uTorrentFalcon( uTorrentConnection( opts.host, opts.user, opts.password ) )
-			else:
-				utorrent = uTorrentConnection( opts.host, opts.user, opts.password ).utorrent()
+			utorrent = uTorrentConnection( opts.host, opts.user, opts.password ).utorrent( opts.api )
 
 		if opts.action == "server_version":
 			print( utorrent.version().verbose_str() if opts.verbose else utorrent.version() )

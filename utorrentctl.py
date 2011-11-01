@@ -20,6 +20,7 @@
 """
 
 from hashlib import sha1
+from collections import OrderedDict
 import base64
 import datetime
 import email.generator

@@ -1349,17 +1349,6 @@ if __name__ == "__main__":
 
 	import optparse, sys
 
-	try:
-		from config import utorrentcfg
-	except ImportError:
-		utorrentcfg = { "host" : None, "login" : None, "password" : None }
-	
-	if not "api" in utorrentcfg:
-		utorrentcfg["api"] = None
-	
-	if not "default_torrent_format" in utorrentcfg:
-		utorrentcfg["default_torrent_format"] = None
-
 	level1 = "   "
 	level2 = level1 * 2
 	level3 = level1 * 3
@@ -1369,6 +1358,18 @@ if __name__ == "__main__":
 	def print( *objs, sep = " ", end = "\n", file = sys.stdout ):
 		global print_orig
 		print_orig( *map( lambda x: str( x ).encode( sys.stdout.encoding, "replace" ).decode( sys.stdout.encoding ), objs ), sep = sep, end = end, file = file )
+
+	def get_config_dir():
+		config_home = os.getenv( "XDG_CONFIG_HOME" )
+		if config_home == None:
+			config_home = os.path.expanduser( "~" ) + os.path.sep + ".config"
+		return config_home + os.path.sep + "utorrentctl" + os.path.sep
+
+	def get_cache_dir():
+		config_home = os.getenv( "XDG_CACHE_HOME" )
+		if config_home == None:
+			config_home = os.path.expanduser( "~" ) + os.path.sep + ".cache"
+		return config_home + os.path.sep + "utorrentctl" + os.path.sep
 
 	def dump_writer( obj, props, level1 = level2, level2 = level3 ):
 		for name in sorted( props ):
@@ -1398,6 +1399,18 @@ if __name__ == "__main__":
 				filetree_writer( leaf, cur_level + 1 )
 			else:
 				print( level1 * cur_level + ( leaf.verbose_str() if opts.verbose else str( leaf ) ) )
+
+	try:
+		sys.path.append( get_config_dir() )
+		from config import utorrentcfg
+	except ImportError:
+		utorrentcfg = { "host" : None, "login" : None, "password" : None }
+
+	if not "api" in utorrentcfg:
+		utorrentcfg["api"] = None
+
+	if not "default_torrent_format" in utorrentcfg:
+		utorrentcfg["default_torrent_format"] = None
 
 	parser = optparse.OptionParser()
 	parser.add_option( "-H", "--host", dest = "host", help = "host of uTorrent (hostname:port)" )

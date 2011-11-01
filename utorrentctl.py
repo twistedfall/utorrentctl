@@ -1281,29 +1281,6 @@ class uTorrentFalcon( uTorrent ):
 	api_version = 1.9
 	# no description yet, what I found out:
 	# * no support for getversion
-	# * settings are received in APIv2 format with additional access field
-
-	def settings_get( self, extended_attributes = False ):
-		res = self.do_action( "getsettings" )
-		out = {}
-		for name, type, value, attrs in res["settings"]:
-			out[name] = self._setting_val( type, value )
-		return out
-
-
-class uTorrentLinuxServer( uTorrent ):
-
-	_TorrentClass = Torrent_API2
-	_FileClass = File_API2
-
-	_pathmodule = posixpath
-
-	api_version = 2 # http://download.utorrent.com/linux/utorrent-server-3.0-21886.tar.gz:bittorrent-server-v3_0/docs/uTorrent_Server.html
-
-	def version( self ):
-		if not self._version:
-			self._version = Version( self.do_action( "getversion" ) )
-		return self._version
 
 	def torrent_remove( self, torrents, with_data = False, with_torrent = False ):
 		if with_data:
@@ -1365,6 +1342,18 @@ class uTorrentLinuxServer( uTorrent ):
 
 	def xfer_history_reset( self ):
 		self.do_action( "resetxferhist" )
+
+
+class uTorrentLinuxServer( uTorrentFalcon ):
+
+	_pathmodule = posixpath
+
+	api_version = 2 # http://download.utorrent.com/linux/utorrent-server-3.0-21886.tar.gz:bittorrent-server-v3_0/docs/uTorrent_Server.html
+
+	def version( self ):
+		if not self._version:
+			self._version = Version( self.do_action( "getversion" ) )
+		return self._version
 
 
 if __name__ == "__main__":
@@ -1678,8 +1667,8 @@ if __name__ == "__main__":
 			res = utorrent.xfer_history_reset()
 
 		elif opts.action == "download":
-			if utorrent.api_version != uTorrentLinuxServer.api_version:
-				raise uTorrentError( "Downloading files only supported for uTorrent Server" )
+			if utorrent.api_version < uTorrentFalcon.api_version:
+				raise uTorrentError( "Downloading files only supported for uTorrent 3.x and uTorrent Server" )
 			for filespec in args:
 				parent_hash, indices = uTorrent.parse_hash_prop( filespec )
 				files = utorrent.file_list( parent_hash )

@@ -1003,9 +1003,25 @@ class uTorrent:
 		out = []
 		if filter_list == None:
 			filter_list = utorrent.rssfilter_list()
-		for id in ids:
-			if int( id ) in filter_list:
-				out.append( filter_list[int( id )].name )
+		for filter_id in ids:
+			if int( filter_id ) in filter_list:
+				out.append( filter_list[int( filter_id )].name )
+		return out
+
+	def parse_file_list_structure( self, file_list ):
+		out = OrderedDict()
+		for file in file_list:
+			parts = file.name.split( self.pathmodule.sep )
+			cur_out = out
+			for i, part in enumerate( parts ):
+				is_last = i == len( parts ) - 1
+				if not part in cur_out:
+					if not is_last:
+						cur_out[part] = OrderedDict()
+				if is_last:
+					cur_out[part] = file
+				else:
+					cur_out = cur_out[part]
 		return out
 
 	def _create_torrent_upload( self, torrent_data, torrent_filename ):
@@ -1370,6 +1386,14 @@ if __name__ == "__main__":
 						print( " = {}".format( value ) )
 			except AttributeError:
 				print()
+
+	def filetree_writer( tree, cur_level = 0 ):
+		for name, leaf in tree.items():
+			if isinstance( leaf, dict ):
+				print( level1 * cur_level + "+ " + name )
+				filetree_writer( leaf, cur_level + 1 )
+			else:
+				print( level1 * cur_level + ( leaf.verbose_str() if opts.verbose else str( leaf ) ) )
 
 	parser = optparse.OptionParser()
 	parser.add_option( "-H", "--host", dest = "host", default = utorrentcfg["host"], help = "host of uTorrent (hostname:port)" )

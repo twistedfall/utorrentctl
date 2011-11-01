@@ -957,17 +957,17 @@ class uTorrent:
 		return " ".join( out )
 
 	@staticmethod
-	def is_hash( hash ):
-		return re.match( "[0-9A-F]{40}$", hash, re.IGNORECASE )
+	def is_hash( torrent_hash ):
+		return re.match( "[0-9A-F]{40}$", torrent_hash, re.IGNORECASE )
 
 	@staticmethod
 	def get_info_hash( torrent_data ):
 		return sha1( bencode( bdecode( torrent_data )["info"] ) ).hexdigest().upper()
 
 	@classmethod
-	def check_hash( cls, hash ):
-		if not cls.is_hash( hash ):
-			raise uTorrentError( "Incorrect hash: {}".format( hash ) )
+	def check_hash( cls, torrent_hash ):
+		if not cls.is_hash( torrent_hash ):
+			raise uTorrentError( "Incorrect hash: {}".format( torrent_hash ) )
 
 	@classmethod
 	def parse_hash_prop( cls, hash_prop ):
@@ -994,9 +994,9 @@ class uTorrent:
 		out = []
 		if rss_list == None:
 			rss_list = utorrent.rss_list()
-		for id in ids:
-			if int( id ) in rss_list:
-				out.append( rss_list[int( id )].url )
+		for feed_id in ids:
+			if int( feed_id ) in rss_list:
+				out.append( rss_list[int( feed_id )].url )
 		return out
 
 	def resolve_filter_ids( self, ids, filter_list = None ):
@@ -1026,13 +1026,13 @@ class uTorrent:
 		out = []
 		for t in torrents:
 			if isinstance( t, self._TorrentClass ):
-				hash = t.hash
+				hsh = t.hash
 			elif isinstance( t, str ):
-				hash = t
+				hsh = t
 			else:
 				raise uTorrentError( "Hash designation only supported via Torrent class or string" )
-			self.check_hash( hash )
-			out.append( hash )
+			self.check_hash( hsh )
+			out.append( hsh )
 		return out
 
 	def _handle_download_dir( self, download_dir ):
@@ -1088,18 +1088,18 @@ class uTorrent:
 		if labels != None:
 			labels.extend( [ Label( i ) for i in res["label"] ] )
 		if rss_feeds != None:
-			for id, feed in self._rssfeed_cache.items():
-				rss_feeds[id] = RssFeed( feed )
+			for feed_id, feed in self._rssfeed_cache.items():
+				rss_feeds[feed_id] = RssFeed( feed )
 		if rss_filters != None:
-			for id, filter in self._rssfilter_cache.items():
-				rss_filters[id] = RssFilter( filter )
+			for filter_id, filter_props in self._rssfilter_cache.items():
+				rss_filters[filter_id] = RssFilter( filter_props )
 		return out
 
 	def torrent_info( self, torrents ):
 		res = self.do_action( "getprops", { "hash" : self._get_hashes( torrents ) } )
 		if not "props" in res:
 			return {}
-		return { hash : info for hash, info in [ ( i["hash"], self._JobInfoClass( self, jobinfo = i ) ) for i in res["props"] ] }
+		return { hsh : info for hsh, info in [ ( i["hash"], self._JobInfoClass( self, jobinfo = i ) ) for i in res["props"] ] }
 
 	def torrent_add_url( self, url, download_dir = None ):
 		prev_dir = self._handle_download_dir( download_dir )
@@ -1195,8 +1195,8 @@ class uTorrent:
 		out = {}
 		if "files" in res:
 			fi = iter( res["files"] );
-			for hash in fi:
-				out[hash] = [ self._FileClass( self, hash, i, f ) for i, f in enumerate( next( fi ) ) ]
+			for hsh in fi:
+				out[hsh] = [ self._FileClass( self, hsh, i, f ) for i, f in enumerate( next( fi ) ) ]
 		return out
 
 	def file_set_priority( self, files ):
@@ -1313,8 +1313,8 @@ class uTorrentLinuxServer( uTorrent ):
 			return int( res["rss_ident"] )
 		return feed_id
 
-	def rss_remove( self, id ):
-		self.do_action( "rss-remove", { "feed-id" : id } )
+	def rss_remove( self, feed_id ):
+		self.do_action( "rss-remove", { "feed-id" : feed_id } )
 
 	def rssfilter_add( self, feed_id = -1 ):
 		return self.rssfilter_update( -1, { "feed-id" : feed_id } )
@@ -1326,8 +1326,8 @@ class uTorrentLinuxServer( uTorrent ):
 			return int( res["filter_ident"] )
 		return filter_id
 
-	def rssfilter_remove( self, id ):
-		self.do_action( "filter-remove", { "filter-id" : id } )
+	def rssfilter_remove( self, filter_id ):
+		self.do_action( "filter-remove", { "filter-id" : filter_id } )
 
 	def xfer_history_get( self ):
 		return self.do_action( "getxferhist" )["transfer_history"]
@@ -1459,21 +1459,21 @@ if __name__ == "__main__":
 		elif opts.action == "add_file":
 			for i in args:
 				print( "Submitting {}...".format( i ) )
-				hash = utorrent.torrent_add_file( i, opts.download_dir )
-				print( level1 + "Info hash = {}".format( hash ) )
+				hsh = utorrent.torrent_add_file( i, opts.download_dir )
+				print( level1 + "Info hash = {}".format( hsh ) )
 				if opts.force:
 					print( level1 + "Forcing start..." )
-					utorrent.torrent_start( hash, True )
+					utorrent.torrent_start( hsh, True )
 
 		elif opts.action == "add_url":
 			for i in args:
 				print( "Submitting {}...".format( i ) )
-				hash = utorrent.torrent_add_url( i, opts.download_dir )
-				if hash != None:
-					print( level1 + "Info hash = {}".format( hash ) )
+				hsh = utorrent.torrent_add_url( i, opts.download_dir )
+				if hsh != None:
+					print( level1 + "Info hash = {}".format( hsh ) )
 					if opts.force:
 						print( level1 + "Forcing start..." )
-						utorrent.torrent_start( hash, True )
+						utorrent.torrent_start( hsh, True )
 
 		elif opts.action == "settings_get":
 			for i in sorted( utorrent.settings_get().items() ):
@@ -1683,9 +1683,9 @@ if __name__ == "__main__":
 						print( "Skipping {}, already exists, specify --force to overwrite...".format( filename ) )
 					else:
 						try:
-							dir = os.path.dirname( filename )
-							if dir != "":
-								os.makedirs( dir )
+							directory = os.path.dirname( filename )
+							if directory != "":
+								os.makedirs( directory )
 						except OSError as e:
 							if( e.args[0] != 17 ): # "File exists" => dir exists, by design, ignore
 								raise e
@@ -1722,28 +1722,28 @@ if __name__ == "__main__":
 			rssfilters = {}
 			utorrent.torrent_list( None, rssfeeds, rssfilters )
 			feed_id_index = {}
-			for id, filter in rssfilters.items():
-				if not filter.feed_id in feed_id_index:
-					feed_id_index[filter.feed_id] = []
-				feed_id_index[filter.feed_id].append( filter )
+			for filter_id, filter_props in rssfilters.items():
+				if not filter_props.feed_id in feed_id_index:
+					feed_id_index[filter_props.feed_id] = []
+				feed_id_index[filter_props.feed_id].append( filter_props )
 			print( "Feeds:" )
 			for feed_id, feed in rssfeeds.items():
 				print( level1 + ( feed.verbose_str() if opts.verbose else str( feed ) ) )
 				if feed_id in feed_id_index:
 					print( level1 + "Filters:" )
-					for filter in feed_id_index[feed_id]:
-						print( level2 + ( filter.verbose_str() if opts.verbose else str( filter ) ) )
+					for filter_props in feed_id_index[feed_id]:
+						print( level2 + ( filter_props.verbose_str() if opts.verbose else str( filter_props ) ) )
 			if -1 in feed_id_index and len( feed_id_index[-1] ) > 0:
 				print( "Global filters:" )
-				for filter in feed_id_index[-1]:
-					print( level1 + ( filter.verbose_str() if opts.verbose else str( filter ) ) )
+				for filter_props in feed_id_index[-1]:
+					print( level1 + ( filter_props.verbose_str() if opts.verbose else str( filter_props ) ) )
 
 		elif opts.action == "rss_add":
 			for url in args:
 				print( "Adding {}...".format( url ) )
-				id = utorrent.rss_add( url )
-				if id != -1:
-					print( level1 + "Feed id = {} (add a filter to it to make it download something)".format( id ) )
+				feed_id = utorrent.rss_add( url )
+				if feed_id != -1:
+					print( level1 + "Feed id = {} (add a filter to it to make it download something)".format( feed_id ) )
 				else:
 					print( level1 + "Failed to add feed" )
 
@@ -1759,8 +1759,8 @@ if __name__ == "__main__":
 				else:
 					feeds = args
 				print( "Updating " + ", ".join( feeds ) + "..." )
-			for id in args:
-				utorrent.rss_update( id, { "update" : 1 } )
+			for feed_id in args:
+				utorrent.rss_update( feed_id, { "update" : 1 } )
 
 		elif opts.action == "rss_remove":
 			if opts.verbose:
@@ -1768,12 +1768,12 @@ if __name__ == "__main__":
 			else:
 				feeds = args
 			print( "Removing " + ", ".join( feeds ) + "..." )
-			for id in args:
-				utorrent.rss_remove( id )
+			for feed_id in args:
+				utorrent.rss_remove( feed_id )
 
 		elif opts.action == "rss_dump":
 			feeds = utorrent.rss_list()
-			for id, feed in { i : f for i, f in feeds.items() if str( i ) in args }.items():
+			for feed_id, feed in { i : f for i, f in feeds.items() if str( i ) in args }.items():
 				print( feed.url )
 				print( level1 + "Properties:" )
 				dump_writer( feed, feed.get_public_attrs() )
@@ -1784,17 +1784,17 @@ if __name__ == "__main__":
 
 		elif opts.action == "rss_set_props":
 			for a in args:
-				id, value = a.split( "=", 1 )
-				id, name = id.split( ".", 1 )
+				feed_id, value = a.split( "=", 1 )
+				feed_id, name = feed_id.split( ".", 1 )
 				if name in RssFeed.get_public_attrs() or name in RssFeed.get_writeonly_attrs():
-					utorrent.rss_update( id, { name : value } )
+					utorrent.rss_update( feed_id, { name : value } )
 
 		elif opts.action == "rssfilter_add":
 			for feed_id in args:
 				print( "Adding filter for feed {}...".format( feed_id ) )
-				id = utorrent.rssfilter_add( feed_id )
-				if id != -1:
-					print( level1 + "Filter id = {}".format( id ) )
+				filter_id = utorrent.rssfilter_add( feed_id )
+				if filter_id != -1:
+					print( level1 + "Filter id = {}".format( filter_id ) )
 				else:
 					print( level1 + "Failed to add filter" )
 
@@ -1804,26 +1804,26 @@ if __name__ == "__main__":
 			else:
 				feeds = args
 			print( "Removing " + ", ".join( feeds ) + "..." )
-			for id in args:
-				utorrent.rssfilter_remove( id )
+			for filter_id in args:
+				utorrent.rssfilter_remove( filter_id )
 
 		elif opts.action == "rssfilter_dump":
 			filters = utorrent.rssfilter_list()
-			for id, filter in { i : f for i, f in filters.items() if str( i ) in args }.items():
-				print( filter.name )
+			for filter_id, filter_props in { i : f for i, f in filters.items() if str( i ) in args }.items():
+				print( filter_props.name )
 				print( level1 + "Properties:" )
-				dump_writer( filter, filter.get_public_attrs() )
+				dump_writer( filter_props, filter_props.get_public_attrs() )
 				print( level1 + "Read-only:" )
-				dump_writer( filter, filter.get_readonly_attrs() )
+				dump_writer( filter_props, filter_props.get_readonly_attrs() )
 				print( level1 + "Write-only:" )
-				dump_writer( filter, filter.get_writeonly_attrs() )
+				dump_writer( filter_props, filter_props.get_writeonly_attrs() )
 
 		elif opts.action == "rssfilter_set_props":
 			for a in args:
-				id, value = a.split( "=", 1 )
-				id, name = id.split( ".", 1 )
+				filter_id, value = a.split( "=", 1 )
+				filter_id, name = filter_id.split( ".", 1 )
 				if name in RssFilter.get_public_attrs() or RssFilter.get_writeonly_attrs():
-					utorrent.rssfilter_update( id, { name.replace( "_", "-" ) : value } )
+					utorrent.rssfilter_update( filter_id, { name.replace( "_", "-" ) : value } )
 
 		elif opts.action == "get_magnet":
 			if opts.verbose:

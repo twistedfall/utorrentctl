@@ -160,6 +160,7 @@ class Version:
 				out.major = 3
 				out.middle = 0
 				out.minor = 0
+				break
 		if not falcon:
 			out.major = 2
 			out.middle = 2

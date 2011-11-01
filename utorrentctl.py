@@ -910,7 +910,7 @@ class uTorrent:
 	_rssfeed_cache = None
 	_rssfilter_cache = None
 
-	api_version = 1 # http://forum.utorrent.com/viewtopic.php?id=25661
+	api_version = 1 # http://user.utorrent.com/community/developers/webapi
 
 	@property
 	def TorrentClass( self ):

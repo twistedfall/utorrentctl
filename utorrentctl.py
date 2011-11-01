@@ -41,17 +41,6 @@ import urllib.request
 def url_quote( string ):
 	return urllib.parse.quote( string, "" )
 
-try:
-	from config import utorrentcfg
-except ImportError:
-	utorrentcfg = { "host" : None, "login" : None, "password" : None }
-
-if not "api" in utorrentcfg:
-	utorrentcfg["api"] = None
-
-if not "default_torrent_format" in utorrentcfg:
-	utorrentcfg["default_torrent_format"] = None
-
 def bdecode( data, str_encoding = "utf8" ):
 	if not hasattr( data, "__next__" ):
 		data = iter( data )
@@ -1359,6 +1348,17 @@ class uTorrentLinuxServer( uTorrentFalcon ):
 if __name__ == "__main__":
 
 	import optparse, sys
+
+	try:
+		from config import utorrentcfg
+	except ImportError:
+		utorrentcfg = { "host" : None, "login" : None, "password" : None }
+	
+	if not "api" in utorrentcfg:
+		utorrentcfg["api"] = None
+	
+	if not "default_torrent_format" in utorrentcfg:
+		utorrentcfg["default_torrent_format"] = None
 
 	level1 = "   "
 	level2 = level1 * 2

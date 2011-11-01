@@ -414,7 +414,7 @@ class Torrent_API2( Torrent ):
 	completed_on = 0
 	_unk_str = 0
 	download_dir = ""
-	
+
 	def __init__( self, utorrent, torrent = None ):
 		Torrent.__init__( self, utorrent, torrent )
 		self._default_format_specs["status"] = "{status_message: <15}"
@@ -1093,7 +1093,7 @@ class uTorrent:
 				self._rssfilter_cache[f[0]] = f
 		else:
 			out = self.do_action( "list" )
-			if "torrents" in out: 
+			if "torrents" in out:
 				self._torrent_cache = { hsh : torrent for hsh, torrent in [ ( t[0], t ) for t in out["torrents"] ] }
 			if "rssfeeds" in out:
 				self._rssfeed_cache = { feed_id : feed for feed_id, feed in [ ( r[0], r ) for r in out["rssfeeds"] ] }
@@ -1634,7 +1634,7 @@ if __name__ == "__main__":
 			today_start = datetime.datetime.now().replace( hour = 0, minute = 0, second = 0, microsecond = 0 )
 			period = len( res["daily_download"] )
 			period_start = today_start - datetime.timedelta( days = period - 1 )
-			
+
 			down_total_local = sum( res["daily_local_download"] )
 			down_total = sum( res["daily_download"] ) - ( down_total_local if excl_local else 0 )
 			up_total_local = sum( res["daily_local_upload"] )
@@ -1648,7 +1648,7 @@ if __name__ == "__main__":
 			print( level1 + "Ratio: {:.2f}".format( up_total / down_total ) )
 			print( level1 + "Added torrents: {}".format( len( period_added_torrents ) ) )
 			print( level1 + "Completed torrents: {}".format( len( period_completed_torrents ) ) )
-			
+
 			down_day_local = res["daily_local_download"][0]
 			down_day = res["daily_download"][0] - ( down_day_local if excl_local else 0 )
 			up_day_local = res["daily_local_upload"][0]
@@ -1679,7 +1679,7 @@ if __name__ == "__main__":
 				torrents = None
 				if indices == None:
 					indices = [ i for i, f in enumerate( files[parent_hash] ) if f.progress == 100 and f.priority.value > 0 ]
-					if len( files ) > 1:
+					if len( files[parent_hash] ) > 1:
 						make_tree = True # whole torrent download => keep directory tree
 					torrents = utorrent.torrent_list()
 				else:

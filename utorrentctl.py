@@ -1093,9 +1093,12 @@ class uTorrent:
 				self._rssfilter_cache[f[0]] = f
 		else:
 			out = self.do_action( "list" )
-			self._torrent_cache = { hash : torrent for hash, torrent in [ ( t[0], t ) for t in out["torrents"] ] }
-			self._rssfeed_cache = { id : feed for id, feed in [ ( r[0], r ) for r in out["rssfeeds"] ] }
-			self._rssfilter_cache = { id : filter for id, filter in [ ( f[0], f ) for f in out["rssfilters"] ] }
+			if "torrents" in out: 
+				self._torrent_cache = { hsh : torrent for hsh, torrent in [ ( t[0], t ) for t in out["torrents"] ] }
+			if "rssfeeds" in out:
+				self._rssfeed_cache = { feed_id : feed for feed_id, feed in [ ( r[0], r ) for r in out["rssfeeds"] ] }
+			if "rssfilters" in out:
+				self._rssfilter_cache = { filter_id : filter_props for filter_id, filter_props in [ ( f[0], f ) for f in out["rssfilters"] ] }
 		self._list_cache_id = out["torrentc"]
 		return out
 

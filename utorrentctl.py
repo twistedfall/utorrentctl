@@ -1702,7 +1702,7 @@ if __name__ == "__main__":
 				if len( files ) == 0:
 					print( "Specified torrent or file does not exist" )
 					sys.exit( 1 )
-				make_tree = False # single file download => put it right in the current directory
+				make_tree = False # single file download => place it in the current directory
 				torrents = None
 				if indices == None:
 					indices = [ i for i, f in enumerate( files[parent_hash] ) if f.progress == 100 and f.priority.value > 0 ]
@@ -1713,10 +1713,7 @@ if __name__ == "__main__":
 					indices = ( int( indices ), )
 
 				def progress( loaded, total ):
-					global bar_width, size_calc, increm, start_time
-					if not size_calc:
-						size_calc = True
-						increm = round( total / bar_width )
+					global bar_width, increm, start_time
 					progr = round( loaded / increm )
 					delta = datetime.datetime.now() - start_time
 					delta = delta.seconds + delta.microseconds / 1000000
@@ -1750,8 +1747,7 @@ if __name__ == "__main__":
 						print( "Downloading {}...".format( filename ) )
 						file = open( filename, "wb" )
 						bar_width = 50
-						size_calc = False
-						increm = 0
+						increm = files[parent_hash][index].size / bar_width
 						start_time = datetime.datetime.now()
 						utorrent.file_get( "{}.{}".format( parent_hash, index ), buffer = file, progress_cb = progress )
 						if opts.verbose:

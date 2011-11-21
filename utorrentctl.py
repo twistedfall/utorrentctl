@@ -732,76 +732,89 @@ class uTorrentConnection( http.client.HTTPConnection ):
 		http.client.HTTPConnection.__init__( self, self._request.host, timeout = 10 )
 		self._fetch_token()
 
-	def _get_data( self, loc, data = None, retry = True, save_buffer = None, progress_cb = None ):
+	def _make_request( self, loc, headers, data = None, retry = True ):
 		last_e = None
-		utserver_retries = 0
+		utserver_retry = False
 		retries = 0
 		max_retries = self._retry_max if retry else 1
-		while retries < max_retries or utserver_retries == 1:
-			try:
-				headers = { k : v for k, v in self._request.header_items() }
-				if data:
-					bnd = email.generator._make_boundary( data )
-					headers["Content-Type"] = "multipart/form-data; boundary={}".format( bnd )
-					data = data.replace( "{{BOUNDARY}}", bnd )
-				self._request.add_data( data )
-				self.request( self._request.get_method(), self._request.get_selector() + loc, self._request.get_data(), headers )
-				resp = self.getresponse()
-				if save_buffer:
-					read = 0
-					resp_len = resp.length
-					while True:
-						buf = resp.read( 10240 )
-						read += len( buf )
-						if progress_cb:
-							progress_cb( read, resp_len )
-						if len( buf ) == 0:
-							break
-						save_buffer.write( buf )
-					return None
-				out = resp.read().decode( "utf8" )
-				if resp.status == 400:
-					last_e = uTorrentError( out.strip() )
-					# FIXME: most probably broken after recent fixes for Windows (closing connect after each _get_data)
-					# if uTorrent server alpha is bound to the same port as WebUI then it will respond with "invalid request" to the first request in the connection
-					if ( not self._utorrent or type( self._utorrent ) == uTorrentLinuxServer ) and utserver_retries == 0:
-						utserver_retries += 1
-						continue
-					raise last_e
-				elif resp.status == 404 or resp.status == 401:
-					raise uTorrentError( "Request {}: {}".format( loc, resp.reason ) )
-				elif resp.status != 200:
-					raise uTorrentError( "{}: {}".format( resp.reason, resp.status ) )
-				self._cookies.extract_cookies( resp, self._request )
-				if len( self._cookies ) > 0:
-					self._request.add_header( "Cookie", "; ".join( [ "{}={}".format( url_quote( c.name ), url_quote( c.value ) ) for c in self._cookies ] ) )
-				return out
-			except socket.gaierror as e:
-				raise uTorrentError( e.strerror )
-			except socket.error as e:
-				if str( e ) == "timed out": # some peculiar handling for timeout error
-					last_e = uTorrentError( "Timeout after {} tries".format( max_retries ) )
-					self.close()
-				elif e.errno == errno.ECONNREFUSED or e.errno == errno.ECONNRESET:
-					raise uTorrentError( e.strerror )
-				elif e.errno == 10053 or e.errno == 10054:
-					# Windows specific socket errors:
-					# 10053 - An established connection was aborted by the software in your host machine
-					# 10054 - An existing connection was forcibly closed by the remote host
+		try:
+			while retries < max_retries or utserver_retry:
+				try:
+					self._request.add_data( data )
+					self.request( self._request.get_method(), self._request.get_selector() + loc, self._request.get_data(), headers )
+					resp = self.getresponse()
+					if resp.status == 400:
+						last_e = uTorrentError( resp.read().decode( "utf8" ).strip() )
+						# if uTorrent server alpha is bound to the same port as WebUI then it will respond with "invalid request" to the first request in the connection
+						# apparently this is no longer the case, TODO: remove this hack
+						if ( not self._utorrent or type( self._utorrent ) == uTorrentLinuxServer ) and not utserver_retry:
+							utserver_retry = True
+							continue
+						raise last_e
+					elif resp.status == 404 or resp.status == 401:
+						raise uTorrentError( "Request {}: {}".format( loc, resp.reason ) )
+					elif resp.status != 200:
+						raise uTorrentError( "{}: {}".format( resp.reason, resp.status ) )
+					self._cookies.extract_cookies( resp, self._request )
+					if len( self._cookies ) > 0:
+						self._request.add_header( "Cookie", "; ".join( [ "{}={}".format( url_quote( c.name ), url_quote( c.value ) ) for c in self._cookies ] ) )
+					return resp
+				# retry when utorrent returns bad data
+				except ( http.client.CannotSendRequest, http.client.BadStatusLine ) as e:
 					last_e = e
 					self.close()
-					time.sleep( 2 )
-				else:
-					raise e
-			except ( http.client.CannotSendRequest, http.client.BadStatusLine ) as e:
-				last_e = e
-				self.close()
-			finally:
-				self.close()
-			retries += 1
-		if last_e:
+				# socket errors
+				except socket.error as e:
+					# retry on timeout
+					if str( e ) == "timed out": # some peculiar handling for timeout error
+						last_e = uTorrentError( "Timeout after {} tries".format( max_retries ) )
+						self.close()
+					# retry after pause on specific windows errors
+					elif e.errno == 10053 or e.errno == 10054:
+						# Windows specific socket errors:
+						# 10053 - An established connection was aborted by the software in your host machine
+						# 10054 - An existing connection was forcibly closed by the remote host
+						last_e = e
+						self.close()
+						time.sleep( 2 )
+					elif e.errno == errno.ECONNREFUSED or e.errno == errno.ECONNRESET:
+						raise uTorrentError( e.strerror )
+					else:
+						raise e
+				# name resolution failed
+				except socket.gaierror as e:
+					raise uTorrentError( e.strerror )
+				retries += 1
+			if last_e:
+				raise last_e
+		except Exception as e:
 			self.close()
-			raise last_e
+			raise e
+		return None
+
+	def _get_data( self, loc, data = None, retry = True, save_buffer = None, progress_cb = None ):
+		headers = { k : v for k, v in self._request.header_items() }
+		if data:
+			bnd = email.generator._make_boundary( data )
+			headers["Content-Type"] = "multipart/form-data; boundary={}".format( bnd )
+			data = data.replace( "{{BOUNDARY}}", bnd )
+		resp = self._make_request( loc, headers, data, retry )
+		if save_buffer:
+			read = 0
+			resp_len = resp.length
+			while True:
+				buf = resp.read( 10240 )
+				read += len( buf )
+				if progress_cb:
+					progress_cb( read, resp_len )
+				if len( buf ) == 0:
+					break
+				save_buffer.write( buf )
+			self.close()
+			return None
+		out = resp.read().decode( "utf8" )
+		self.close()
+		return out
 
 	def _fetch_token( self ):
 		data = self._get_data( "gui/token.html" )

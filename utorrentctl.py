@@ -497,7 +497,8 @@ class File:
 		return "{} {}".format( self.hash, self.name )
 
 	def verbose_str( self ):
-		return "{: <44} [{: <15}] {: >5}% ({: >9} / {: >9}) {}".format( self.hash, self.priority, self.progress, self.downloaded_h, self.size_h, self.name )
+		return "{: <44} [{: <15}] {: >5}% ({: >9} / {: >9}) {}".format( self.hash, self.priority, self.progress, \
+			self.downloaded_h, self.size_h, self.name )
 
 	def fill( self, file ):
 		self.name, self.size, self.downloaded, priority = file[:4]

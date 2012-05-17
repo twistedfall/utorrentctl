@@ -1714,7 +1714,7 @@ if __name__ == "__main__":
 
 				def progress( loaded, total ):
 					global bar_width, increm, start_time
-					progr = round( loaded / increm )
+					progr = round( loaded / increm ) if increm > 0 else 1
 					delta = datetime.datetime.now() - start_time
 					delta = delta.seconds + delta.microseconds / 1000000
 					if opts.verbose:
@@ -1722,7 +1722,7 @@ if __name__ == "__main__":
 							"*" * progr, "_" * ( bar_width - progr ),
 							uTorrent.human_size( total ),
 							uTorrent.human_size( loaded / delta ),
-							uTorrent.human_time_delta( ( total - loaded ) / ( loaded / delta ) ),
+							uTorrent.human_time_delta( ( total - loaded ) / ( loaded / delta ) if loaded > 0 else 0 ),
 							" " * 25
 							), sep = "", end = ""
 						)
@@ -1734,7 +1734,7 @@ if __name__ == "__main__":
 						filename = torrents[parent_hash].name + os.path.sep + os.path.normpath( files[parent_hash][index].name )
 					else:
 						filename = utorrent.pathmodule.basename( files[parent_hash][index].name )
-					if os.path.exists( filename ) and os.path.getsize( filename ) > 0 and not opts.force:
+					if os.path.exists( filename ) and not opts.force:
 						print( "Skipping {}, already exists, specify --force to overwrite...".format( filename ) )
 					else:
 						try:

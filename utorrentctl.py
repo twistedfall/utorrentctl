@@ -1441,7 +1441,7 @@ if __name__ == "__main__":
 	parser.add_option( "--desc", action = "store_true", dest = "sort_desc", default = False, help = "sort torrents in descending order" )
 	parser.add_option( "-a", "--add-file", action = "store_const", dest = "action", const = "add_file", help = "add torrents specified by local file names, with force flag will force-start torrent after adding (filename filename ...)" )
 	parser.add_option( "-u", "--add-url", action = "store_const", dest = "action", const = "add_url", help = "add torrents specified by urls, with force flag will force-start torrent after adding magnet url (url url ...)" )
-	parser.add_option( "--dir", dest = "download_dir", help = "directory to download added torrent, absolute or relative to current download dir (only for --add)" )
+	parser.add_option( "--dir", dest = "download_dir", help = "directory to download added torrent, absolute or relative to current download dir (for add, download)" )
 	parser.add_option( "--settings", action = "store_const", dest = "action", const = "settings_get", help = "show current server settings, optionally you can use specific setting keys (name name ...)" )
 	parser.add_option( "--set", action = "store_const", dest = "action", const = "settings_set", help = "assign settings value (key1=value1 key2=value2 ...)" )
 	parser.add_option( "--start", action = "store_const", dest = "action", const = "torrent_start", help = "start torrents (hash hash ...)" )
@@ -1702,7 +1702,8 @@ if __name__ == "__main__":
 				if len( files ) == 0:
 					print( "Specified torrent or file does not exist" )
 					sys.exit( 1 )
-				make_tree = False # single file download => place it in the current directory
+				base_dir = opts.download_dir if opts.download_dir else "."
+				make_tree = False # single file download => place it in the base directory
 				torrents = None
 				if indices == None:
 					indices = [ i for i, f in enumerate( files[parent_hash] ) if f.progress == 100 and f.priority.value > 0 ]
@@ -1731,16 +1732,14 @@ if __name__ == "__main__":
 
 				for index in indices:
 					if make_tree:
-						filename = torrents[parent_hash].name + os.path.sep + os.path.normpath( files[parent_hash][index].name )
+						filename = base_dir + os.path.sep + torrents[parent_hash].name + os.path.sep + os.path.normpath( files[parent_hash][index].name )
 					else:
-						filename = utorrent.pathmodule.basename( files[parent_hash][index].name )
+						filename = base_dir + os.path.sep + utorrent.pathmodule.basename( files[parent_hash][index].name )
 					if os.path.exists( filename ) and not opts.force:
 						print( "Skipping {}, already exists, specify --force to overwrite...".format( filename ) )
 					else:
 						try:
-							directory = os.path.dirname( filename )
-							if directory != "":
-								os.makedirs( directory )
+							os.makedirs( os.path.dirname( filename ) )
 						except OSError as e:
 							if( e.args[0] != 17 ): # "File exists" => dir exists, by design, ignore
 								raise e

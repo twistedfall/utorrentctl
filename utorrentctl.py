@@ -777,7 +777,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 						last_e = e
 						self.close()
 						time.sleep( 2 )
-					elif e.errno == errno.ECONNREFUSED or e.errno == errno.ECONNRESET:
+					elif e.errno == errno.ECONNREFUSED or e.errno == errno.ECONNRESET or errno == errno.EHOSTUNREACH:
 						raise uTorrentError( e.strerror )
 					else:
 						raise e

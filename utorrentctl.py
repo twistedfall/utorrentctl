@@ -1637,8 +1637,7 @@ if __name__ == "__main__":
 				print( tors[hsh].verbose_str( opts.format ) if opts.verbose else tors[hsh] )
 				print( level1 + ( infos[hsh].verbose_str() if opts.verbose else str( infos[hsh] ) ) )
 				print( level1 + "Files ({}):".format( len( fls ) ) )
-				for f in fls:
-					print( level2 + ( f.verbose_str() if opts.verbose else str( f ) ) )
+				filetree_writer( utorrent.parse_file_list_structure( files[hsh] ), 2 )
 				print( level1 + "Trackers:" )
 				for tr in infos[hsh].trackers:
 					print( level2 + tr )
@@ -1882,7 +1881,7 @@ if __name__ == "__main__":
 			if opts.verbose:
 				tors = utorrent.torrent_list()
 			for hsh, lnk in utorrent.torrent_get_magnet( args ).items():
-				print( tors[hsh] if opts.verbose else hsh )
+				print( "{}:".format( tors[hsh] if opts.verbose else hsh ) )
 				print( level1 + lnk )
 
 		else:

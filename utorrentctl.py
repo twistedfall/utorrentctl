@@ -183,7 +183,7 @@ class Version:
 		return self.user_agent
 
 	def verbose_str( self ):
-		return "{} {}/{} {} v{}.{}.{}.{}, engine v{}, ui v{}".format(
+		return "{} {}/{} {} v{}.{}.{}.{}, engine v{}, ui v{}".format( 
 			self.user_agent, self.device_id, self.peer_id, self.product,
 			self.major, self.middle, self.minor, self.build, self.engine, self.ui
 		)
@@ -249,8 +249,8 @@ class TorrentStatus:
 			else:
 				if self.started:
 					return "[F] Downloading"
-#				else:
-#					return "Stopped"
+# 				else:
+# 					return "Stopped"
 		return "Stopped"
 
 	def __lt__( self, other ):
@@ -537,9 +537,9 @@ class JobInfo:
 	seed_ratio = 0
 	seed_time = 0
 
-	def __init__( self, utorrent, hash = None, jobinfo = None ):
+	def __init__( self, utorrent, torrent_hash = None, jobinfo = None ):
 		self._utorrent = utorrent
-		self.hash = hash
+		self.hash = torrent_hash
 		if jobinfo:
 			self.fill( jobinfo )
 
@@ -547,7 +547,7 @@ class JobInfo:
 		return "Limits D:{} U:{}".format( self.dlrate, self.ulrate )
 
 	def verbose_str( self ):
-		return str( self ) + "  Superseed:{}  DHT:{}  PEX:{}  Queuing override:{}  Seed ratio:{}  Seed time:{}".format(
+		return str( self ) + "  Superseed:{}  DHT:{}  PEX:{}  Queuing override:{}  Seed ratio:{}  Seed time:{}".format( 
 			self._tribool_status_str( self.superseed ), self._tribool_status_str( self.dht ),
 			self._tribool_status_str( self.pex ), self._tribool_status_str( self.seed_override ), self.seed_ratio,
 			uTorrent.human_time_delta( self.seed_time )
@@ -627,7 +627,7 @@ class RssFeed:
 		return "{: <3} {: <3} {}".format( self.id, "on" if self.enabled else "off", self.url )
 
 	def verbose_str( self ):
-		return "{} ({}/{}) update: {}".format(
+		return "{} ({}/{}) update: {}".format( 
 			str( self ), len( [ x for x in self.entries if x.in_history ] ), len( self.entries ), self.next_update
 		)
 
@@ -753,7 +753,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 						raise last_e
 					elif resp.status == 404 or resp.status == 401:
 						raise uTorrentError( "Request {}: {}".format( loc, resp.reason ) )
-					elif resp.status != 200:
+					elif resp.status != 200 and resp.status != 206:
 						raise uTorrentError( "{}: {}".format( resp.reason, resp.status ) )
 					self._cookies.extract_cookies( resp, self._request )
 					if len( self._cookies ) > 0:
@@ -792,16 +792,28 @@ class uTorrentConnection( http.client.HTTPConnection ):
 			raise e
 		return None
 
-	def _get_data( self, loc, data = None, retry = True, save_buffer = None, progress_cb = None ):
+	def _get_data( self, loc, data = None, retry = True, range_start = None, range_len = None, save_buffer = None, progress_cb = None ):
 		headers = { k : v for k, v in self._request.header_items() }
 		if data:
 			bnd = email.generator._make_boundary( data )
 			headers["Content-Type"] = "multipart/form-data; boundary={}".format( bnd )
 			data = data.replace( "{{BOUNDARY}}", bnd )
+		if range_start != None:
+			if range_len == None or range_len == 0:
+				range_end = ""
+			else:
+				range_end = range_start + range_len - 1
+			headers["Range"] = "bytes={}-{}".format( range_start, range_end )
 		resp = self._make_request( loc, headers, data, retry )
 		if save_buffer:
 			read = 0
 			resp_len = resp.length
+			content_range = resp.getheader( "Content-Range" )
+			if content_range != None:
+				m = re.match( "^bytes (\\d+)-\\d+/(\\d+)$", content_range )
+				if m != None:
+					read = int( m.group( 1 ) ) - 1
+					resp_len = int( m.group( 2 ) )
 			while True:
 				buf = resp.read( 10240 )
 				read += len( buf )
@@ -853,7 +865,7 @@ class uTorrentConnection( http.client.HTTPConnection ):
 			section = "gui/"
 		return section + "?" + "&".join( args ) + params_str
 
-	def do_action( self, action, params = None, params_str = None, data = None, retry = True, save_buffer = None, progress_cb = None ):
+	def do_action( self, action, params = None, params_str = None, data = None, retry = True, range_start = None, range_len = None, save_buffer = None, progress_cb = None ):
 		# uTorrent can send incorrect overlapping array objects, this will fix them, converting them to list
 		def obj_hook( obj ):
 			out = {}
@@ -863,7 +875,15 @@ class uTorrentConnection( http.client.HTTPConnection ):
 				else:
 					out[k] = v
 			return out
-		res = self._get_data( self._action( action, params, params_str ), data = data, retry = retry, save_buffer = save_buffer, progress_cb = progress_cb )
+		res = self._get_data( 
+			self._action( action, params, params_str ),
+			data = data,
+			retry = retry,
+			range_start = range_start,
+			range_len = range_len,
+			save_buffer = save_buffer,
+			progress_cb = progress_cb
+		)
 		if res:
 			return json.loads( res, object_pairs_hook = obj_hook )
 		else:
@@ -1040,7 +1060,7 @@ class uTorrent:
 		return out
 
 	def _create_torrent_upload( self, torrent_data, torrent_filename ):
-		out = "\r\n".join( (
+		out = "\r\n".join( ( 
 			"--{{BOUNDARY}}",
 			'Content-Disposition: form-data; name="torrent_file"; filename="{}"'.format( url_quote( torrent_filename ) ),
 			"Content-Type: application/x-bittorrent",
@@ -1079,8 +1099,18 @@ class uTorrent:
 		if prev_dir:
 			self.settings_set( { "dir_active_download" : prev_dir } )
 
-	def do_action( self, action, params = None, params_str = None, data = None, retry = True, save_buffer = None, progress_cb = None ):
-		return self._connection.do_action( action = action, params = params, params_str = params_str, data = data, retry = retry, save_buffer = save_buffer, progress_cb = progress_cb )
+	def do_action( self, action, params = None, params_str = None, data = None, retry = True, range_start = None, range_len = None, save_buffer = None, progress_cb = None ):
+		return self._connection.do_action( 
+			action = action,
+			params = params,
+			params_str = params_str,
+			data = data,
+			retry = retry,
+			range_start = range_start,
+			range_len = range_len,
+			save_buffer = save_buffer,
+			progress_cb = progress_cb
+		)
 
 	def version( self ):
 		if not self._version:
@@ -1303,9 +1333,16 @@ class uTorrentFalcon( uTorrent ):
 	def torrent_remove_with_data_torrent( self, torrents ):
 		return self.torrent_remove( torrents, True, True )
 
-	def file_get( self, file_hash, buffer, progress_cb = None ):
+	def file_get( self, file_hash, buffer, range_start = None, range_len = None, progress_cb = None ):
 		parent_hash, index = self.parse_hash_prop( file_hash )
-		self.do_action( "proxy", { "id" : parent_hash, "file" : index }, save_buffer = buffer, progress_cb = progress_cb )
+		self.do_action( 
+			"proxy",
+			{ "id" : parent_hash, "file" : index },
+			range_start = range_start,
+			range_len = range_len,
+			save_buffer = buffer,
+			progress_cb = progress_cb
+		)
 
 	def settings_get( self, extended_attributes = False ):
 		res = self.do_action( "getsettings" )
@@ -1508,7 +1545,7 @@ if __name__ == "__main__":
 						else:
 							print( t )
 			if opts.verbose:
-				print( "Total speed: D:{}/s U:{}/s  count: {}  size: {}".format(
+				print( "Total speed: D:{}/s U:{}/s  count: {}  size: {}".format( 
 					uTorrent.human_size( total_dl ), uTorrent.human_size( total_ul ),
 					count, uTorrent.human_size( total_size )
 				) )
@@ -1719,7 +1756,7 @@ if __name__ == "__main__":
 					delta = datetime.datetime.now() - start_time
 					delta = delta.seconds + delta.microseconds / 1000000
 					if opts.verbose:
-						print( "[{}{}] {} {}/s eta: {}{}".format(
+						print( "[{}{}] {} {}/s eta: {}{}".format( 
 							"*" * progr, "_" * ( bar_width - progr ),
 							uTorrent.human_size( total ),
 							uTorrent.human_size( loaded / delta ),
@@ -1735,20 +1772,30 @@ if __name__ == "__main__":
 						filename = base_dir + os.path.sep + torrents[parent_hash].name + os.path.sep + os.path.normpath( files[parent_hash][index].name )
 					else:
 						filename = base_dir + os.path.sep + utorrent.pathmodule.basename( files[parent_hash][index].name )
-					if os.path.exists( filename ) and not opts.force:
-						print( "Skipping {}, already exists, specify --force to overwrite...".format( filename ) )
+					file = None
+					range_start = None
+					if os.path.exists( filename ):
+						if opts.force:
+							file = open( filename, "wb" )
+							file.truncate()
+						elif os.path.getsize( filename ) == files[parent_hash][index].size:
+							print( "Skipping {}, already exists, specify --force to overwrite...".format( filename ) )
+						else:
+							file = open( filename, "ab" )
+							range_start = os.path.getsize( filename )
 					else:
 						try:
 							os.makedirs( os.path.dirname( filename ) )
 						except OSError as e:
 							if( e.args[0] != 17 ): # "File exists" => dir exists, by design, ignore
 								raise e
-						print( "Downloading {}...".format( filename ) )
 						file = open( filename, "wb" )
+					if file != None:
+						print( "Downloading {}...".format( filename ) )
 						bar_width = 50
 						increm = files[parent_hash][index].size / bar_width
 						start_time = datetime.datetime.now()
-						utorrent.file_get( "{}.{}".format( parent_hash, index ), buffer = file, progress_cb = progress )
+						utorrent.file_get( "{}.{}".format( parent_hash, index ), file, range_start = range_start, progress_cb = progress )
 						if opts.verbose:
 							print( "" )
 

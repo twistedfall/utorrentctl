@@ -1772,6 +1772,7 @@ if __name__ == "__main__":
 						filename = base_dir + os.path.sep + torrents[parent_hash].name + os.path.sep + os.path.normpath( files[parent_hash][index].name )
 					else:
 						filename = base_dir + os.path.sep + utorrent.pathmodule.basename( files[parent_hash][index].name )
+					verb = "Downloading"
 					file = None
 					range_start = None
 					if os.path.exists( filename ):
@@ -1781,6 +1782,7 @@ if __name__ == "__main__":
 						elif os.path.getsize( filename ) == files[parent_hash][index].size:
 							print( "Skipping {}, already exists, specify --force to overwrite...".format( filename ) )
 						else:
+							verb = "Resuming download"
 							file = open( filename, "ab" )
 							range_start = os.path.getsize( filename )
 					else:
@@ -1791,7 +1793,7 @@ if __name__ == "__main__":
 								raise e
 						file = open( filename, "wb" )
 					if file != None:
-						print( "Downloading {}...".format( filename ) )
+						print( "{} {}...".format( verb, filename ) )
 						bar_width = 50
 						increm = files[parent_hash][index].size / bar_width
 						start_time = datetime.datetime.now()

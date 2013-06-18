@@ -1509,6 +1509,7 @@ if __name__ == "__main__":
 	parser.add_option( "--rssfilter-dump", action = "store_const", dest = "action", const = "rssfilter_dump", help = "show full rss filter info in key=value view (filter_id filter_id ...)" )
 	parser.add_option( "--rssfilter-set-props", action = "store_const", dest = "action", const = "rssfilter_set_props", help = "change properties of rss filter; use --rssfilter-dump to view them (filter_id.prop=value filter_id.prop=value ...)" )
 	parser.add_option( "--magnet", action = "store_const", dest = "action", const = "get_magnet", help = "generate magnet link for the specified torrents (hash hash ...)" )
+	parser.add_option( "--limit", dest = "limit", default = 0, help = "limit the number of records to return, 0 returns all, default is 0")
 	opts, args = parser.parse_args()
 
 	try:
@@ -1531,12 +1532,16 @@ if __name__ == "__main__":
 		elif opts.action == "torrent_list":
 			total_ul, total_dl, count, total_size = 0, 0, 0, 0
 			opts.sort_field = opts.sort_field.lower()
+			# ensure that int is returned
+			opts.limit = int(opts.limit)
 			if not opts.sort_field in utorrent.TorrentClass.get_public_attrs() + utorrent.TorrentClass.get_readonly_attrs():
 				opts.sort_field = "name"
 			for h, t in sorted( utorrent.torrent_list().items(), key = lambda x: getattr( x[1], opts.sort_field ), reverse = opts.sort_desc ):
 				if not opts.active or opts.active and ( t.ul_speed > 0 or t.dl_speed > 0 ): # handle --active
 					if opts.label == None or opts.label == t.label: # handle --label
 						count += 1
+						if opts.limit > 0 and count > opts.limit:
+							break
 						total_size += t.progress / 100 * t.size
 						if opts.verbose:
 							print( t.verbose_str( opts.format ) )

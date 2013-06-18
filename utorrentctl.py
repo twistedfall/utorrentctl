@@ -1510,6 +1510,7 @@ if __name__ == "__main__":
 	parser.add_option( "--rssfilter-set-props", action = "store_const", dest = "action", const = "rssfilter_set_props", help = "change properties of rss filter; use --rssfilter-dump to view them (filter_id.prop=value filter_id.prop=value ...)" )
 	parser.add_option( "--magnet", action = "store_const", dest = "action", const = "get_magnet", help = "generate magnet link for the specified torrents (hash hash ...)" )
 	parser.add_option( "--limit", dest = "limit", default = 0, help = "limit the number of records to return, 0 returns all, default is 0")
+	parser.add_option( "--limit-complete", dest = "limit_complete", default = False, help = "only return torrents with a progress of 100%")
 	opts, args = parser.parse_args()
 
 	try:
@@ -1539,9 +1540,11 @@ if __name__ == "__main__":
 			for h, t in sorted( utorrent.torrent_list().items(), key = lambda x: getattr( x[1], opts.sort_field ), reverse = opts.sort_desc ):
 				if not opts.active or opts.active and ( t.ul_speed > 0 or t.dl_speed > 0 ): # handle --active
 					if opts.label == None or opts.label == t.label: # handle --label
-						count += 1
-						if opts.limit > 0 and count > opts.limit:
+						if opts.limit_complete and t.progress < 100:
+							continue
+						if opts.limit > 0 and count >= opts.limit:
 							break
+						count += 1
 						total_size += t.progress / 100 * t.size
 						if opts.verbose:
 							print( t.verbose_str( opts.format ) )

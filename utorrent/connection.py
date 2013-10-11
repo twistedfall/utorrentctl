@@ -128,13 +128,12 @@ class Connection( http.client.HTTPConnection ):
 			if content_range is not None:
 				m = re.match( "^bytes (\\d+)-\\d+/(\\d+)$", content_range )
 				if m is not None:
-					read = int( m.group( 1 ) ) - 1
 					resp_len = int( m.group( 2 ) )
 			while True:
 				buf = resp.read( 10240 )
 				read += len( buf )
 				if progress_cb:
-					progress_cb( read, resp_len )
+					progress_cb( range_start, read, resp_len )
 				if len( buf ) == 0:
 					break
 				save_buffer.write( buf )

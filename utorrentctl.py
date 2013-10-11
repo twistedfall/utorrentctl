@@ -36,9 +36,7 @@ level3 = level1 * 3
 
 
 def print_console( *objs, sep = " ", end = "\n", file = sys.stdout ):
-	global print_orig
-	print( *map( lambda x: str( x ).encode( sys.stdout.encoding, "replace" ).decode( sys.stdout.encoding ), objs ), sep = sep, end = end,
-	       file = file )
+	print( *map( lambda x: str( x ).encode( sys.stdout.encoding, "replace" ).decode( sys.stdout.encoding ), objs ), sep = sep, end = end, file = file )
 
 
 def get_config_dir():
@@ -428,9 +426,11 @@ try:
 			else:
 				indices = ( int( indices ), )
 
-			def progress( loaded, total ):
-				global bar_width, increm, start_time
-				progr = int( round( loaded / increm ) ) if increm > 0 else 1
+			def progress( range_start, loaded, total ):
+				global bar_width, tick_size, start_time
+				if range_start is None:
+					range_start = 0
+				progr = int( round( ( range_start + loaded ) / tick_size ) ) if tick_size > 0 else 1
 				delta = datetime.datetime.now( ) - start_time
 				delta = delta.seconds + delta.microseconds / 1000000
 				if opts.verbose:
@@ -473,7 +473,7 @@ try:
 				if file is not None:
 					print_console( "{} {}...".format( verb, filename ) )
 					bar_width = 50
-					increm = files[parent_hash][index].size / bar_width
+					tick_size = files[parent_hash][index].size / bar_width
 					start_time = datetime.datetime.now( )
 					utorrent.file_get( "{}.{}".format( parent_hash, index ), file, range_start = range_start, progress_cb = progress )
 					if opts.verbose:

@@ -164,13 +164,8 @@ class Desktop:
 
 	def _create_torrent_upload( self, torrent_data, torrent_filename ):
 		out = "\r\n".join( (
-		"--{{BOUNDARY}}",
-		'Content-Disposition: form-data; name="torrent_file"; filename="{}"'.format( utorrent._url_quote( torrent_filename ) ),
-		"Content-Type: application/x-bittorrent",
-		"",
-		torrent_data.decode( "latin1" ),
-		"--{{BOUNDARY}}",
-		"",
+		"--{{BOUNDARY}}", 'Content-Disposition: form-data; name="torrent_file"; filename="{}"'.format( utorrent._url_quote( torrent_filename ) ),
+		"Content-Type: application/x-bittorrent", "", torrent_data.decode( "latin1" ), "--{{BOUNDARY}}", "",
 		) )
 		return out
 
@@ -204,17 +199,8 @@ class Desktop:
 
 	def do_action( self, action, params = None, params_str = None, data = None, retry = True, range_start = None, range_len = None, save_buffer = None,
 	               progress_cb = None ):
-		return self._connection.do_action(
-			action = action,
-			params = params,
-			params_str = params_str,
-			data = data,
-			retry = retry,
-			range_start = range_start,
-			range_len = range_len,
-			save_buffer = save_buffer,
-			progress_cb = progress_cb
-		)
+		return self._connection.do_action( action = action, params = params, params_str = params_str, data = data, retry = retry,
+		                                   range_start = range_start, range_len = range_len, save_buffer = save_buffer, progress_cb = progress_cb )
 
 	def version( self ):
 		if not self._version:
@@ -441,14 +427,8 @@ class Falcon( Desktop ):
 
 	def file_get( self, file_hash, buffer, range_start = None, range_len = None, progress_cb = None ):
 		parent_hash, index = self.parse_hash_prop( file_hash )
-		self.do_action(
-			"proxy",
-			{ "id": parent_hash, "file": index },
-			range_start = range_start,
-			range_len = range_len,
-			save_buffer = buffer,
-			progress_cb = progress_cb
-		)
+		self.do_action( "proxy", { "id": parent_hash, "file": index }, range_start = range_start, range_len = range_len, save_buffer = buffer,
+		                progress_cb = progress_cb )
 
 	def settings_get( self, extended_attributes = False ):
 		res = self.do_action( "getsettings" )
@@ -558,7 +538,5 @@ class Version:
 		return self.user_agent
 
 	def verbose_str( self ):
-		return "{} {}/{} {} v{}.{}.{}.{}, engine v{}, ui v{}".format(
-			self.user_agent, self.device_id, self.peer_id, self.product,
-			self.major, self.middle, self.minor, self.build, self.engine, self.ui
-		)
+		return "{} {}/{} {} v{}.{}.{}.{}, engine v{}, ui v{}".format( self.user_agent, self.device_id, self.peer_id, self.product, self.major,
+		                                                              self.middle, self.minor, self.build, self.engine, self.ui )

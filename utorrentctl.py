@@ -29,7 +29,6 @@ from utorrent.connection import Connection
 from utorrent import uTorrentError
 import utorrent as utorrent_module
 
-
 level1 = "   "
 level2 = level1 * 2
 level3 = level1 * 3
@@ -39,14 +38,14 @@ def print_console( *objs, sep = " ", end = "\n", file = sys.stdout ):
 	print( *map( lambda x: str( x ).encode( sys.stdout.encoding, "replace" ).decode( sys.stdout.encoding ), objs ), sep = sep, end = end, file = file )
 
 
-def get_config_dir():
+def get_config_dir( ):
 	config_home = os.getenv( "XDG_CONFIG_HOME" )
 	if config_home is None:
 		config_home = os.path.expanduser( "~" ) + os.path.sep + ".config"
 	return config_home + os.path.sep + "utorrentctl" + os.path.sep
 
 
-def get_cache_dir():
+def get_cache_dir( ):
 	config_home = os.getenv( "XDG_CACHE_HOME" )
 	if config_home is None:
 		config_home = os.path.expanduser( "~" ) + os.path.sep + ".cache"
@@ -100,6 +99,7 @@ parser = optparse.OptionParser( )
 parser.add_option( "-H", "--host", dest = "host", help = "host of uTorrent (hostname:port)" )
 parser.add_option( "-U", "--user", dest = "user", help = "WebUI login" )
 parser.add_option( "-P", "--password", dest = "password", help = "WebUI password" )
+parser.add_option( "-S", "--ssl", action = "store_true", dest = "ssl", default = False, help = "Use SSL when connecting to uTorrent instance" )
 parser.add_option( "--api", dest = "api",
                    help = "Disable autodetection of server version and force specific API: linux, desktop (2.x), falcon (3.x)" )
 parser.add_option( "-n", "--nv", "--no-verbose", action = "store_false", dest = "verbose", default = True,
@@ -186,10 +186,12 @@ try:
 			opts.password = utorrentcfg["password"]
 		if opts.api is None:
 			opts.api = utorrentcfg["api"]
+		if opts.ssl == False and "ssl" in utorrentcfg and utorrentcfg["ssl"] is not None:
+			opts.ssl = utorrentcfg["ssl"]
 
 	utorrent = None
 	if opts.action is not None:
-		utorrent = Connection( opts.host, opts.user, opts.password ).utorrent( opts.api )
+		utorrent = Connection( opts.host, opts.user, opts.password, opts.ssl ).utorrent( opts.api )
 
 	if opts.action == "server_version":
 		print_console( utorrent.version( ).verbose_str( ) if opts.verbose else utorrent.version( ) )
@@ -215,10 +217,9 @@ try:
 					else:
 						print_console( t )
 		if opts.verbose:
-			print_console( "Total speed: D:{}/s U:{}/s  count: {}  size: {}".format(
-				utorrent_module.human_size( total_dl ), utorrent_module.human_size( total_ul ),
-				count, utorrent_module.human_size( total_size )
-			) )
+			print_console(
+				"Total speed: D:{}/s U:{}/s  count: {}  size: {}".format( utorrent_module.human_size( total_dl ), utorrent_module.human_size( total_ul ),
+				                                                          count, utorrent_module.human_size( total_size ) ) )
 
 	elif opts.action == "add_file":
 		for i in args:
@@ -434,14 +435,9 @@ try:
 				delta = datetime.datetime.now( ) - start_time
 				delta = delta.seconds + delta.microseconds / 1000000
 				if opts.verbose:
-					print_console( "[{}{}] {} {}/s eta: {}{}".format(
-						"*" * progr, "_" * ( bar_width - progr ),
-						utorrent_module.human_size( total ),
-						utorrent_module.human_size( loaded / delta ),
-						utorrent_module.human_time_delta( ( total - loaded ) / ( loaded / delta ) if loaded > 0 else 0 ),
-						" " * 25
-					), sep = "", end = ""
-					)
+					print_console( "[{}{}] {} {}/s eta: {}{}".format( "*" * progr, "_" * ( bar_width - progr ), utorrent_module.human_size( total ),
+					                                                  utorrent_module.human_size( loaded / delta ), utorrent_module.human_time_delta(
+							( total - loaded ) / ( loaded / delta ) if loaded > 0 else 0 ), " " * 25 ), sep = "", end = "" )
 					print_console( "\b" * ( bar_width + 70 ), end = "" )
 					sys.stdout.flush( )
 

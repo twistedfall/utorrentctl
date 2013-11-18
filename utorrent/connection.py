@@ -12,16 +12,14 @@ import urllib.request
 import time
 import errno
 import email.generator
+import urllib.request
 import urllib.parse
 import utorrent
 import utorrent.uTorrent
 
 
-class Connection( http.client.HTTPConnection ):
-	_host = ""
-	_login = ""
-	_password = ""
-
+class Connection:
+	_connection = None
 	_request = None
 	_cookies = http.cookiejar.CookieJar( )
 	_token = ""
@@ -34,17 +32,19 @@ class Connection( http.client.HTTPConnection ):
 	def request_obj( self ):
 		return self._request
 
-	def __init__( self, host, login, password ):
-		self._host = host
-		self._login = login
-		self._password = password
-		self._url = "http://{}/".format( self._host )
+	def __init__( self, host, login, password, ssl = False ):
+		if ssl:
+			self._url = "https://{}/".format( host )
+		else:
+			self._url = "http://{}/".format( host )
 		self._request = urllib.request.Request( self._url )
-		self._request.add_header( "Authorization",
-		                          "Basic " + b64encode( "{}:{}".format( self._login, self._password ).encode( "latin1" ) ).decode( "ascii" ) )
-		http.client.HTTPConnection.__init__( self, self._request.host, timeout = 10 )
+		if ssl:
+			self._connection = http.client.HTTPSConnection( host )
+		else:
+			self._connection = http.client.HTTPConnection( host )
+		self._connection.timeout = 10
+		self._request.add_header( "Authorization", "Basic " + b64encode( "{}:{}".format( login, password ).encode( "latin1" ) ).decode( "ascii" ) )
 		self._fetch_token( )
-
 
 	def _make_request( self, loc, headers, data = None, retry = True ):
 		last_e = None
@@ -55,8 +55,8 @@ class Connection( http.client.HTTPConnection ):
 			while retries < max_retries or utserver_retry:
 				try:
 					self._request.add_data( data )
-					self.request( self._request.get_method( ), self._request.get_selector( ) + loc, self._request.get_data( ), headers )
-					resp = self.getresponse( )
+					self._connection.request( self._request.get_method( ), self._request.get_selector( ) + loc, self._request.get_data( ), headers )
+					resp = self._connection.getresponse( )
 					if resp.status == 400:
 						last_e = utorrent.uTorrentError( resp.read( ).decode( "utf8" ).strip( ) )
 						# if uTorrent server alpha is bound to the same port as WebUI then it will respond with "invalid request" to the first request in the connection
@@ -71,14 +71,13 @@ class Connection( http.client.HTTPConnection ):
 						raise utorrent.uTorrentError( "{}: {}".format( resp.reason, resp.status ) )
 					self._cookies.extract_cookies( resp, self._request )
 					if len( self._cookies ) > 0:
-						self._request.add_header( "Cookie",
-						                          "; ".join( ["{}={}".format( utorrent._url_quote( c.name ), utorrent._url_quote( c.value ) ) for c in
-						                                      self._cookies] ) )
+						self._request.add_header( "Cookie", "; ".join(
+							["{}={}".format( utorrent._url_quote( c.name ), utorrent._url_quote( c.value ) ) for c in self._cookies] ) )
 					return resp
 				# retry when utorrent returns bad data
 				except ( http.client.CannotSendRequest, http.client.BadStatusLine ) as e:
 					last_e = e
-					self.close( )
+					self._connection.close( )
 				# name resolution failed
 				except socket.gaierror as e:
 					raise utorrent.uTorrentError( e.strerror )
@@ -87,14 +86,14 @@ class Connection( http.client.HTTPConnection ):
 					# retry on timeout
 					if str( e ) == "timed out": # some peculiar handling for timeout error
 						last_e = utorrent.uTorrentError( "Timeout after {} tries".format( max_retries ) )
-						self.close( )
+						self._connection.close( )
 					# retry after pause on specific windows errors
 					elif e.errno == 10053 or e.errno == 10054:
 						# Windows specific socket errors:
 						# 10053 - An established connection was aborted by the software in your host machine
 						# 10054 - An existing connection was forcibly closed by the remote host
 						last_e = e
-						self.close( )
+						self._connection.close( )
 						time.sleep( 2 )
 					elif e.errno == errno.ECONNREFUSED or e.errno == errno.ECONNRESET or errno == errno.EHOSTUNREACH:
 						raise utorrent.uTorrentError( e.strerror )
@@ -104,7 +103,7 @@ class Connection( http.client.HTTPConnection ):
 			if last_e:
 				raise last_e
 		except Exception as e:
-			self.close( )
+			self._connection.close( )
 			raise e
 		return None
 
@@ -137,10 +136,10 @@ class Connection( http.client.HTTPConnection ):
 				if len( buf ) == 0:
 					break
 				save_buffer.write( buf )
-			self.close( )
+			self._connection.close( )
 			return None
 		out = resp.read( ).decode( "utf8" )
-		self.close( )
+		self._connection.close( )
 		return out
 
 	def _fetch_token( self ):
@@ -192,15 +191,8 @@ class Connection( http.client.HTTPConnection ):
 					out[k] = v
 			return out
 
-		res = self._get_data(
-			self._action( action, params, params_str ),
-			data = data,
-			retry = retry,
-			range_start = range_start,
-			range_len = range_len,
-			save_buffer = save_buffer,
-			progress_cb = progress_cb
-		)
+		res = self._get_data( self._action( action, params, params_str ), data = data, retry = retry, range_start = range_start, range_len = range_len,
+		                      save_buffer = save_buffer, progress_cb = progress_cb )
 		if res:
 			return json.loads( res, object_pairs_hook = obj_hook )
 		else:

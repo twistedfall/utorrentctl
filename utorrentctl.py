@@ -93,7 +93,7 @@ if not "api" in utorrentcfg:
 	utorrentcfg["api"] = None
 
 if not "default_torrent_format" in utorrentcfg:
-	utorrentcfg["default_torrent_format"] = None
+	utorrentcfg["default_torrent_format"] = "{hash_code} {status} {progress}% {size} {dl_speed} {ul_speed} {ratio} {peer_info} eta: {eta} {name} {label}"
 
 parser = optparse.OptionParser( )
 parser.add_option( "-H", "--host", dest = "host", help = "host of uTorrent (hostname:port)" )

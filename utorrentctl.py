@@ -34,8 +34,8 @@ level2 = level1 * 2
 level3 = level1 * 3
 
 
-def print_console( *objs, sep = " ", end = "\n", file = sys.stdout ):
-	print( *map( lambda x: str( x ).encode( sys.stdout.encoding, "replace" ).decode( sys.stdout.encoding ), objs ), sep = sep, end = end, file = file )
+def print_console( *objs, sep = " ", end = "\n" ):
+	print( *map( lambda x: str( x ).encode( sys.stdout.encoding, "replace" ).decode( sys.stdout.encoding ), objs ), sep = sep, end = end )
 
 
 def get_config_dir( ):

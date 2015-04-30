@@ -177,7 +177,7 @@ parser.add_option( "--limit", dest = "limit", default = 0, help = "limit the num
 opts, args = parser.parse_args( )
 
 try:
-
+	print(opts.host)
 	if opts.host is None: # we didn't supply host in command line => load auth data from config
 		opts.host = utorrentcfg["host"]
 		if opts.user is None:

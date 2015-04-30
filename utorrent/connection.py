@@ -54,8 +54,8 @@ class Connection:
 		try:
 			while retries < max_retries or utserver_retry:
 				try:
-					self._request.add_data( data )
-					self._connection.request( self._request.get_method( ), self._request.get_selector( ) + loc, self._request.get_data( ), headers )
+					self._request.data = data
+					self._connection.request( self._request.get_method( ), self._request.selector + loc, self._request.data, headers )
 					resp = self._connection.getresponse( )
 					if resp.status == 400:
 						last_e = utorrent.uTorrentError( resp.read( ).decode( "utf8" ).strip( ) )
@@ -215,7 +215,7 @@ class Connection:
 					raise e
 			if ver.product == "server":
 				return utorrent.uTorrent.LinuxServer( self, ver )
-			elif ver.product == "desktop":
+			elif ver.product == "desktop" or ver.product == "PRODUCT_CODE":
 				if ver.major == 3:
 					return utorrent.uTorrent.Falcon( self, ver )
 				else:

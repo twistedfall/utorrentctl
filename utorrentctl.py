@@ -20,14 +20,15 @@
 
 """
 import datetime
-import os
 import optparse
+import os
 import sys
-import utorrent.rss as rss
-from utorrent.uTorrent import Desktop, Falcon, LinuxServer
-from utorrent.connection import Connection
-from utorrent import uTorrentError
+
 import utorrent as utorrent_module
+import utorrent.rss as rss
+from utorrent import uTorrentError
+from utorrent.connection import Connection
+from utorrent.uTorrent import Desktop, Falcon, LinuxServer
 
 level1 = "   "
 level2 = level1 * 2
@@ -35,7 +36,7 @@ level3 = level1 * 3
 
 
 def print_console( *objs, sep = " ", end = "\n" ):
-	print( *map( lambda x: str( x ).encode( sys.stdout.encoding, "replace" ).decode( sys.stdout.encoding ), objs ), sep = sep, end = end )
+	print(*[str(x).encode(sys.stdout.encoding, "replace").decode(sys.stdout.encoding) for x in objs], sep=sep, end=end)
 
 
 def get_config_dir( ):
@@ -526,7 +527,7 @@ try:
 		feed_list = None
 		if opts.all:
 			feed_list = utorrent.rss_list( )
-			args = list( map( str, feed_list.keys( ) ) )
+			args = [str(x) for x in feed_list.keys()]
 			print_console( "Updating all rss feeds..." )
 		else:
 			if opts.verbose:

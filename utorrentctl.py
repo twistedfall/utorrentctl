@@ -104,6 +104,7 @@ parser.add_option( "-H", "--host", dest = "host", help = "host of uTorrent (host
 parser.add_option( "-U", "--user", dest = "user", help = "WebUI login" )
 parser.add_option( "-P", "--password", dest = "password", help = "WebUI password" )
 parser.add_option( "-S", "--ssl", action = "store_true", dest = "ssl", default = False, help = "Use SSL when connecting to uTorrent instance" )
+parser.add_option("--no-ssl-verify", action="store_false", dest="ssl_verify", default=True, help="Don't perform SSL verification for server certificate")
 parser.add_option( "--api", dest = "api",
                    help = "Disable autodetection of server version and force specific API: linux, desktop (2.x), falcon (3.x)" )
 parser.add_option( "-n", "--nv", "--no-verbose", action = "store_false", dest = "verbose", default = True,
@@ -191,10 +192,12 @@ try:
 			opts.api = utorrentcfg["api"]
 		if opts.ssl == False and "ssl" in utorrentcfg and utorrentcfg["ssl"] is not None:
 			opts.ssl = utorrentcfg["ssl"]
+		if opts.ssl_verify == True and "ssl_verify" in utorrentcfg and utorrentcfg["ssl_verify"] is not None:
+			opts.ssl_verify = utorrentcfg["ssl_verify"]
 
 	utorrent = None
 	if opts.action is not None:
-		utorrent = Connection( opts.host, opts.user, opts.password, opts.ssl ).utorrent( opts.api )
+		utorrent = Connection(opts.host, opts.user, opts.password, opts.ssl, opts.ssl_verify).utorrent(opts.api)
 
 	if opts.action == "server_version":
 		print_console( utorrent.version( ).verbose_str( ) if opts.verbose else utorrent.version( ) )

@@ -2,18 +2,20 @@
 uTorrentConnection
 """
 
-from base64 import b64encode
+import email.generator
+import errno
 import http.client
 import http.cookiejar
 import json
 import re
 import socket
-import urllib.request
+import ssl as ssl_module
 import time
-import errno
-import email.generator
-import urllib.request
 import urllib.parse
+import urllib.request
+import urllib.request
+from base64 import b64encode
+
 import utorrent
 import utorrent.uTorrent
 
@@ -32,14 +34,15 @@ class Connection:
 	def request_obj( self ):
 		return self._request
 
-	def __init__( self, host, login, password, ssl = False ):
+	def __init__(self, host, login, password, ssl=False, ssl_verify=True):
 		if ssl:
 			self._url = "https://{}/".format( host )
 		else:
 			self._url = "http://{}/".format( host )
 		self._request = urllib.request.Request( self._url )
 		if ssl:
-			self._connection = http.client.HTTPSConnection( host )
+			ssl_context = None if ssl_verify else ssl_module._create_unverified_context()
+			self._connection = http.client.HTTPSConnection(host, context=ssl_context)
 		else:
 			self._connection = http.client.HTTPConnection( host )
 		self._connection.timeout = 10

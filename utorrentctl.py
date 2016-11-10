@@ -84,17 +84,20 @@ def filetree_writer( tree, cur_level = 0 ):
 			print_console( level1 * cur_level + ( leaf.verbose_str( ) if opts.verbose else str( leaf ) ) )
 
 
+utorrentcfg = {
+	"host": None,
+	"login": None,
+	"password": None,
+	"api": None,
+	"default_torrent_format": "{hash_code} {status} {progress}% {size} {dl_speed} {ul_speed} {ratio} {peer_info} eta: {eta} {name} {label}",
+}
+
 try:
 	sys.path.append( get_config_dir( ) )
-	from config import utorrentcfg
+	from config import utorrentcfg as user_utorrentcfg
+	utorrentcfg.update(user_utorrentcfg)
 except ImportError:
-	utorrentcfg = { "host": None, "login": None, "password": None }
-
-if not "api" in utorrentcfg:
-	utorrentcfg["api"] = None
-
-if not "default_torrent_format" in utorrentcfg:
-	utorrentcfg["default_torrent_format"] = "{hash_code} {status} {progress}% {size} {dl_speed} {ul_speed} {ratio} {peer_info} eta: {eta} {name} {label}"
+	pass
 
 parser = optparse.OptionParser( )
 parser.add_option( "-H", "--host", dest = "host", help = "host of uTorrent (hostname:port)" )
